@@ -42,6 +42,24 @@ public:
     virtual bool saveGameInfo();
     virtual bool retrieveGameInfo();
 
+    virtual bool saveObject(boost::shared_ptr<IGObject> ob);
+    virtual boost::shared_ptr<IGObject> retrieveObject(uint32_t obid);
+    virtual uint32_t getMaxObjectId();
+    virtual IdSet getObjectIds();
+
+    virtual bool saveOrderQueue(const boost::shared_ptr<OrderQueue> oq);
+    virtual bool updateOrderQueue(const boost::shared_ptr<OrderQueue> oq);
+    virtual boost::shared_ptr<OrderQueue> retrieveOrderQueue(uint32_t oqid);
+    virtual bool removeOrderQueue(uint32_t oqid);
+    virtual IdSet getOrderQueueIds();
+    virtual uint32_t getMaxOrderQueueId();
+
+    virtual bool saveOrder(uint32_t queueid, uint32_t ordid, Order* ord);
+    virtual bool updateOrder(uint32_t queueid, uint32_t ordid, Order* ord);
+    virtual Order* retrieveOrder(uint32_t queueid, uint32_t ordid);
+    virtual bool removeOrder(uint32_t queueid, uint32_t ordid);
+
+
     std::string addslashes(const std::string& in) const;
     uint32_t getTableVersion(const std::string& name);
 private:
@@ -50,6 +68,7 @@ private:
         sqlite3* db;
         char* db_err;
 
+    void singleQuery( const std::string& query );
     uint32_t valueQuery( const std::string& query );
 
 };

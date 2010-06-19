@@ -5,6 +5,9 @@
  * Created on June 17, 2010, 10:54 AM
  */
 
+//included in persistence.h
+#include <stdint.h>
+
 #include <sstream>
 
 #include <tpserver/logging.h>
@@ -435,7 +438,501 @@ bool SqlitePersistence::saveGameInfo(){
 
 bool SqlitePersistence::retrieveGameInfo(){
     try {
+        SqliteQuery query(db, "SELECT * FROM gameinfo;" );
+        query.nextRow();
+        Game* game = Game::getGame();
+        game->setKey(query.get(0));
+        game->setGameStartTime(query.getU64(1));
+        game->setTurnNumber(query.getInt(2));
+        game->setTurnName(query.get(3));
+    } catch (SqliteException& e) { return false; }
+    return true;
+}
 
+bool SqlitePersistence::saveObject(IGObject::Ptr ob){
+    try {
+        std::ostringstream querybuilder;
+        uint32_t turn = Game::getGame()->getTurnNumber();
+        uint32_t obid = ob->getID();
+
+        querybuilder << "DELETE FROM object WHERE objetid = " << obid << " AND turnnum = " << turn << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "INSERT INTO object VALUES (" << obid << ", " << turn << ", ";
+        querybuilder << (ob->isAlive() ? 1 : 0) << ", " << ob->getType() << ", ";
+        querybuilder << << "'" << addslashes(ob->getName()) << "', '" << addslashes(ob->getDescription()) << "', ";
+        querybuilder << ob->getParent() << ", " << ob->getModTime() << ");";
+        singleQuery( querybuilder.str() );
+
+        bool rtv = true;
+        //store type-specific information
+        if(ob->isAlive()){
+            try{
+                ObjectParameterGroup::Map groups = ob->getParameterGroups();
+                for(ObjectParameterGroup::Mapp::iterator itcurr = groups.begin();
+                        itcurr != groups.end(); ++itcurr){
+                    ObjectParameterGroup::ParameterList params = itcurr->second->getParameters();
+                    uint32_t ppos = 0;
+                    for(ObjectParameterGroup::ParameterList::iterator paramcurr = params.begin();
+                            paramcurr != params.end(); ++paramcurr){
+                        ObjectParameter* parameter = *(paramcurr);
+                        switch(parameter->getType()){
+                            case obpT_Position_3D:
+                                updatePosition3dObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<Position3dObjectParam*>(parameter));
+                                break;
+                            case obpT_Velocity:
+                                updateVelocity3dObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<Velocity3dObjectParam*>(parameter));
+                                break;
+                            case obpT_Order_Queue:
+                                updateOrderQueueObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<OrderQueueObjectParam*>(parameter));
+                                break;
+                            case obpT_Resource_List:
+                                updateResourceListObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<ResourceListObjectParam*>(parameter));
+                                break;
+                            case obpT_Reference:
+                                updateReferenceObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<ReferenceObjectParam*>(parameter));
+                                break;
+                            case obpT_Reference_Quantity_List:
+                                updateRefQuantityListObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<RefQuantityListObjectParam*>(parameter));
+                                break;
+                            case obpT_Integer:
+                                updateIntegerObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<IntegerObjectParam*>(parameter));
+                                break;
+                            case obpT_Size:
+                                updateSizeObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<SizeObjectParam*>(parameter));
+                                break;
+                            case obpT_Media:
+                                updateMediaObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<MediaObjectParam*>(parameter));
+                                break;
+                            default:
+                                Logger::getLogger()->error("Unknown ObjectParameter type %d", parameter->getType());
+                                throw std::exception();
+                                break;
+                        }
+                        ppos++;
+                    }
+                }
+            } catch (std::exception& e){
+                rtv = false;
+            }
+        }
+        ob->setIsDirty(!rtv);
+
+        return rtv;
+    } catch ( SqliteException& e ){
+        ob->setIsDirty(true);
+        return false;
+    }
+    return true;
+}
+
+IGObject::Ptr SqlitePersistence::retrieveObject(uint32_t obid){
+    try{
+        std::ostringstream querybuilder;
+        uint32_t turn = Game::getGame()->getTurnNumber();
+
+        querybuilder << "SELECT * FROM object WHERE objectid = " << obid << " AND turnnum <= " << turn;
+        querybuilder << " ORDER BY turnnum DESC LIMIT 1;";
+        SqliteQuery query( db, querybuilder.str() );
+        query.nextRob();
+
+        IGObject::Ptr object( new IGObject(obid) );
+
+        Game::getGame()->getObjectTypeManager()->setupObject(object, query.getInt(3));
+        object->setIsAlive(query.getInt(2) == 1);
+        object->setName(query.get(4));
+        object->setDescription(query.get(5));
+        object->setParent(query.getInt(6));
+
+        //children object ids
+        querybuilder.str("");
+        // CHECK: object.objectid
+        querybuilder << "SELECT object.objectid FROM object JOIN (SELECT objectid, MAX(turnnum) AS maxturnnum FROM object WHERE turnnum <= " << turn << " GROUP BY objectid) AS maxx ON (object.objectid=maxx.objectid AND object.turnnum = maxx.maxturnnum) WHERE parentid = " << obid << " ;";
+        SqliteQuery cquery(db, querybuilder.str() );
+
+        while(cquery.nextRow()){
+            uint32_t childid = cquery.getInt(0);
+            DEBUG("childid: %d", childid);
+            if(childid != object->getID())
+                object->addContainedObject(childid);
+        }
+        DEBUG("num children: %d", object->getContainedObjects().size());
+
+        //fetch type-specific information
+        if(object->isAlive()){
+            try{
+                std::map<uint32_t, ObjectParameterGroup::Ptr> groups = object->getParameterGroups();
+                for(std::map<uint32_t, ObjectParameterGroup::Ptr>::iterator itcurr = groups.begin();
+                        itcurr != groups.end(); ++itcurr){
+                    ObjectParameterGroup::ParameterList params = itcurr->second->getParameters();
+                    uint32_t ppos = 0;
+                    for(ObjectParameterGroup::ParameterList::iterator paramcurr = params.begin();
+                            paramcurr != params.end(); ++paramcurr){
+                        ObjectParameter* parameter *(paramcurr);
+                        switch(parameter->getType()){
+                            case obpT_Position_3D:
+                                retrievePosition3dObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<Position3dObjectParam*>(parameter));
+                                break;
+                            case obpT_Velocity:
+                                retrieveVelocity3dObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<Velocity3dObjectParam*>(parameter));
+                                break;
+                            case obpT_Order_Queue:
+                                retrieveOrderQueueObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<OrderQueueObjectParam*>(parameter));
+                                break;
+                            case obpT_Resource_List:
+                                retrieveResourceListObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<ResourceListObjectParam*>(parameter));
+                                break;
+                            case obpT_Reference:
+                                retrieveReferenceObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<ReferenceObjectParam*>(parameter));
+                                break;
+                            case obpT_Reference_Quantity_List:
+                                retrieveRefQuantityListObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<RefQuantityListObjectParam*>(parameter));
+                                break;
+                            case obpT_Integer:
+                                retrieveIntegerObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<IntegerObjectParam*>(parameter));
+                                break;
+                            case obpT_Size:
+                                retrieveSizeObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<SizeObjectParam*>(parameter));
+                                break;
+                            case obpT_Media:
+                                retrieveMediaObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<MediaObjectParam*>(parameter));
+                                break;
+                            default:
+                                Logger::getLogger()->error("Unknown ObjectParameter type %d", parameter->getType());
+                                throw std::exception();
+                                break;
+                        }
+                        ppos++;
+                    }
+                }
+            } catch (std::exception& e){
+                object.reset();
+                return object;
+            }
+        }
+
+        object->setModTime( query.getU64(7));
+        object->setIsDirty(false);
+
+        return object;
+    } catch (SqliteException& e ) {
+        return IGObject::Ptr();
+    }
+}
+
+uint32_t SqlitePersistence::getMaxObjectId(){
+    try{
+        return valueQuery( "SELECT MAX(objectid) from object;");
+    } catch (SqliteException& e) {
+        return 0;
+    }
+}
+
+IdSet SqlitePersistence::getObjectIds(){
+    try {
+        SqliteQuery query(db, "SELECT objectid FROM object;");
+        IdSet vis;
+        while (query.nextRow() ){
+            vis.insert(query.getInt(0) );
+        }
+        return vis;
+    } catch (SqliteException& e){
+        return IdSet();
+    }
+}
+
+bool SqlitePersistence::saveOrderQueue(const boost::shared_ptr<OrderQueue> oq){
+    try{
+        std::ostringstream querybuilder;
+        querybuilder << "INSERT INTO orderqueue VALUEs (" << oq->getQueueId() << ", " << oq->getObjectId() << ", ";
+        querybuidler << (oq->isActive() ? 1 : 0) << ", " << (oq->isRepeating() ? 1 : 0) << ", " << oq->getModTime() << ");";
+        singleQuery(querybuilder.str() );
+
+        insertList( "orderslot", oq->getQueueID(), oq->getOrderSlots() );
+        insertSet ( "orderqueueowner", oq->getQueueID(), oq->getOwner() );
+        insertSet ( "orderqueueallowedtype", oq->getQueueId(), oq->getAllowedOrderTypes() );
+        return true;
+    } catch (SqliteException& e) {
+        return false;
+    }
+}
+
+bool SqlitePersistence::updateOrderQueue(const boost::shared_ptr<OrderQueue> oq){
+    try{
+        std::ostringstream querybuilder;
+        querybuilder << "UPDATE orderqueue set objectid=" << oq->getObjectId() << ", active=" <<(oq->isActive ? 1 : 0);
+        querybuidler << ", repeating=" (oq->isRepeating() ? 1 : 0) << ", modtime=" << oq->getModTime() << " WHERE queueid =" << oq->getQueueID() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM orderslots WHERE queueid=" << oq->getQueueId() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM orderqueueowner WHERE queueid=" << oq->getQueueId() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM orderqueueallowedtype WHERE queueid=" << oq->getQueueId() << ";";
+        singleQuery( querybuilder.str() );
+
+        insertList( "orderslot", oq->getQueueId(), oq->getOrderSlots() );
+        insertSet ( "orderqueueowner", oq->getQueueId(), oq->getOwner() );
+        insertSet ( "orderqueueallowedtype", oq->getQueueId(), oq->getAllowedOrderTypes() );
+
+        return true;
+    } catch (SqliteException& e){
+        return false;
+    }
+}
+
+OrderQueue::Ptr SqlitePersistence::retrieveOrderQueue(uint32_t oqid){
+    try{
+        std::ostringstream querybuilder;
+
+
+        querybuilder << "SELECT * FROM orderqueue WHERE queueid=" << oqid << ";";
+
+        SqliteQuery query(db, querybuilder.str() );
+        OrderQueue::Ptr oq( new OrderQueue(oqid, query.getInt(1), 0) );
+        oq->setActive(query.getInt(2) == 1);
+        oq->setRepeating(query.getInt(3) == 1);
+        oq->setModTime(query.getU64(4));
+
+
+        querybuilder.str("");
+        querybuilder << "SELECT orderid FROM orderslot WHERE queueid=" << oqid << " ORDER BY slot;";
+
+        IdList oolist = idListQuery( querybuilder.str() );
+        uint32_t max = (*(std::max_element( oolist.begin(), oolist.end() )));
+        oq->setOrderSlots(oolist);
+        oq->setNextOrderId(max+1);
+
+        querybuilder.str("");
+        querybuilder << "SELECT playerid FROM orderqueueowner WHERE queueid=" << oqid << ";";
+        oq->setOwners( idSetQuery( querybuilder.str() ) );
+
+        querybuilder.str("");
+        querybuilder << "SELECT ordertype FROM orderqueueallowedtype WHERE queueid=" << oqid << ";";
+        oq->setAllowedOrderTypes( idSetQuery( querybuilder.str() ) );
+
+        return oq;
+    } catch (SqliteException& e) {
+        return OrderQueue::Ptr();
+    }
+}
+
+bool SqlitePersistence::removeOrderQueue(uint32_t oqid){
+    try{
+        std::ostringstream querybuilder;
+        querybuilder << "DELETE FROM orderslot WHERE queueid=" << oqid << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM orderqueueowner WHERE queueid=" << oqid << ";";
+        singleQuery( querybuilder.str() );
+
+        return true;
+    } catch ( SqliteException& e ) { return false; }
+}
+
+IdSet SqlitePersistence::getOrderQueueIds(){
+    try {
+        return idSetQuery( "SELECT queueid FROM orderqueue;");
+    } catch ( SqliteException& e ) {return IdSet(); }
+}
+
+uint32_t SqlitePersistence::getMaxOrderQueueId(){
+    try {
+        return valueQuery( "SELECT MAX(queueid) FROM orderqueue;" );
+    } catch ( SqliteException& e) { return 0; }
+}
+
+bool SqlitePersistence::saveOrder(uint32_t queueid, uint32_t ordid, Order* ord){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "INSERT INTO ordertype VALUES (" << queueid << ", " << ordid << ", " << ord->getType() << ", " << ord->getTurns() << ");";
+        singleQuery( querybuilder.str() );
+
+        insertMap( "orderresource", queueid, ordid, ord->getResources() );
+
+        //store parameters
+        uint32_t parampos = 0;
+        std::list<OrderParameter*> params = ord->getParameters();
+        for(std::list<OrderParameter*>::iterator itcurr = params.begin(); itcurr != params.end(); ++itcurr){
+            switch((*itcurr)->getType()){
+                case opT_Space_Coord_Abs:
+                    updateSpaceCoordParam(queueid, ordid, parampos, static_cast<SpaceCoordParam*>(*itcurr));
+                    break;
+                case opT_Time:
+                    updateTimeParameter(queueid, ordid, parampos, static_cast<TimeParameter*>(*itcurr));
+                    break;
+                case opT_Object_ID:
+                    updateObjectOrderParameter(queueid, ordid, parampos, static_cast<ObjectOrderParameter*>(*itcurr));
+                    break;
+                case opT_List:
+                    updateListParameter(queueid, ordid, parampos, static_cast<ListParameter*>(*itcurr));
+                    break;
+                case opT_String:
+                    updateStringParameter(queueid, ordid, parampos, static_cast<StringParameter*>(*itcurr));
+                    break;
+                default:
+                    Logger::getLogger()->error("SqlitePersistence: unknown order parameter type at save");
+                    return false;
+            }
+            parampos++;
+        }
+
+        return true;
+
+    } catch (SqliteException& e) { return false; }
+}
+
+bool SqlitePersistence::updateOrder(uint32_t queueid, uint32_t ordid, Order* ord){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "UPDATE ordertype SET type = " << ord->getType() << ", turns=" << ord->getTurns() << " WHERE queueid=" << queueid << " AND orderid=" << ordid << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM orderresource WHERE queueid=" << queueid << " AND orderid=" << ordid << ";";
+        singleQuery( querybuilder.str() );
+
+        insertMap( "orderresource", queueid, ordid, ord->getResources() );
+
+        //update parameters
+        uint32_t parampos = 0;
+        std::list<OrderParameter*> params = ord->getParameters();
+        for(std::list<OrderParameter*>::iterator itcurr = params.begin(); itcurr != params.end(); ++itcurr){
+            switch((*itcurr)->getType()){
+                case opT_Space_Coord_Abs:
+                    updateSpaceCoordParam(queueid, ordid, parampos, static_cast<SpaceCoordParam*>(*itcurr));
+                    break;
+                case opT_Time:
+                    updateTimeParameter(queueid, ordid, parampos, static_cast<TimeParameter*>(*itcurr));
+                    break;
+                case opT_Object_ID:
+                    updateObjectOrderParameter(queueid, ordid, parampos, static_cast<ObjectOrderParameter*>(*itcurr));
+                    break;
+                case opT_List:
+                    updateListParameter(queueid, ordid, parampos, static_cast<ListParameter*>(*itcurr));
+                    break;
+                case opT_String:
+                    updateStringParameter(queueid, ordid, parampos, static_cast<StringParameter*>(*itcurr));
+                    break;
+                default:
+                    Logger::getLogger()->error("SqlitePersistence: unknown order parameter type at update");
+                    return false;
+            }
+            parampos++;
+        }
+        return true;
+    } catch (SqliteException& e ) { return false; }
+}
+
+Order* SqlitePersistence::retrieveOrder(uint32_t queueid, uint32_t ordid){
+    Order* order = NULL;
+    try {
+        std::ostringstream querybuilder;
+        {
+            querybuilder << "SELECT type,turns FROM ordertype WHERE queueid = " << queueid << " AND orderid = " << ordid << ";";
+            MysqlQuery query( conn, querybuilder.str() );
+
+            order = Game::getGame()->getOrderManager()->createOrder( query.getInt(0) );
+            order->setTurns( query.getInt(1) );
+            order->setOrderQueueId(queueid);
+        }
+
+        //fetch resources
+        {
+            querybuilder.str("");
+            querybuilder << "SELECT resourceid, amount FROM orderresource WHERE queueid=" << queueid << " AND orderid=" << ordid << ";";
+            MysqlQuery query( conn, querybuilder.str() );
+            while( query.nextRow() ){
+                order->addResource(query.getInt(0), query.getInt(1));
+            }
+        }
+        //fetch parameters
+        uint32_t parampos = 0;
+        std::list<OrderParameter*> params = order->getParameters();
+        for(std::list<OrderParameter*>::iterator itcurr = params.begin(); itcurr != params.end(); ++itcurr){
+            switch((*itcurr)->getType()){
+                case opT_Space_Coord_Abs:
+                    retrieveSpaceCoordParam(queueid, ordid, parampos, static_cast<SpaceCoordParam*>(*itcurr));
+                    break;
+                case opT_Time:
+                    retrieveTimeParameter(queueid, ordid, parampos, static_cast<TimeParameter*>(*itcurr));
+                    break;
+                case opT_Object_ID:
+                    retrieveObjectOrderParameter(queueid, ordid, parampos, static_cast<ObjectOrderParameter*>(*itcurr));
+                    break;
+                case opT_List:
+                    retrieveListParameter(queueid, ordid, parampos, static_cast<ListParameter*>(*itcurr));
+                    break;
+                case opT_String:
+                    retrieveStringParameter(queueid, ordid, parampos, static_cast<StringParameter*>(*itcurr));
+                    break;
+                default:
+                    Logger::getLogger()->error("SqlitePersistence: unknown order parameter type at retrieve");
+                    return false;
+            }
+            parampos++;
+        }
+
+        return order;
+    } catch( SqliteException& e ) {
+        delete order;
+        return false;
+    }
+}
+
+bool SqlitePersistence::removeOrder(uint32_t queueid, uint32_t ordid){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "SELECT type FROM ordertype WHERE queueid=" << queueid << " AND orderid=" << ordid <<";";
+        uint32_t ordertype = valueQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM ordertype WHERE queueid= " << queueid << " AND orderid=" << ordid << ";";
+        singleQuery( querybuilder.str() );
+
+        //remove resources
+        querybuilder.str("");
+        querybuilder << "DELETE FROM orderresource WHERE queueid=" << queueid << " AND orderid=" << ordid << ";";
+        singleQuery( querybuilder.str() );
+
+        //remove parameters
+        uint32_t parampos = 0;
+        Order* order = Game::getGame()->getOrderManager()->createOrder(ordertype);
+        std::list<OrderParameter*> params = order->getParameters();
+        for(std::list<OrderParameter*>::iterator itcurr = params.begin(); itcurr != params.end(); ++itcurr){
+            switch((*itcurr)->getType()){
+                case opT_Space_Coord_Abs:
+                    removeSpaceCoordParam(queueid, ordid, parampos);
+                    break;
+                case opT_Time:
+                    removeTimeParameter(queueid, ordid, parampos);
+                    break;
+                case opT_Object_ID:
+                    removeObjectOrderParameter(queueid, ordid, parampos);
+                    break;
+                case opT_List:
+                    removeListParameter(queueid, ordid, parampos);
+                    break;
+                case opT_String:
+                    removeStringParameter(queueid, ordid, parampos);
+                    break;
+                default:
+                    Logger::getLogger()->error("SqlitePersistence: unknown order parameter type at remove");
+                    return false;
+            }
+            parampos++;
+        }
+        delete order;
+        return true;
+    } catch( MysqlException& ) {
+        return false; 
     }
 }
 
@@ -456,8 +953,12 @@ uint32_t SqlitePersistence::getTableVersion(const std::string& name){
     }
 }
 
+void SqlitePersistence::singleQuery( const std::string& query ) {
+    SqliteQuery q( db, query );
+}
+
 uint32_t SqlitePersistence::valueQuery( const std::string& query ) {
-    SqliteQuery q( conn, query );
+    SqliteQuery q( db, query );
     if(q.validRow()){
         return q.getInt(0);
     }
@@ -476,7 +977,7 @@ SqliteQuery::SqliteQuery( sqlite3* db, const std::string& new_query )
 
 }
 
-    const std::string SqliteQuery::get( uint32_t index ) {
+const std::string SqliteQuery::get( uint32_t index ) {
         if ( result == NULL )
         {
             fetchResult();
@@ -485,7 +986,7 @@ SqliteQuery::SqliteQuery( sqlite3* db, const std::string& new_query )
         if ( row == NULL ) {
             throw SqliteException( database, "Query '"+query+"' row empty!");
         }
-        return row[index];
+        return (sqlite3_column_text(stmt, index));
   }
 
 int SqliteQuery::getInt( uint32_t index ) {
@@ -499,7 +1000,7 @@ int SqliteQuery::getInt( uint32_t index ) {
     if ( row[index] == NULL ){
         throw SqliteException( database, "Int value is NULL");
     }
-    return atoi(row[index]);
+    return sqlite3_column_int(stmt, index);
 }
 
 uint64_t SqliteQuery::getU64( uint32_t index ) {
@@ -513,7 +1014,7 @@ uint64_t SqliteQuery::getU64( uint32_t index ) {
     if ( row[index] == NULL ){
         throw SqliteException( database, "UInt64 value is NULL");
     }
-    return strtoull(row[index],NULL,10);
+    return strtoull((sqlite3_column_text(stmt, index)),NULL,10);
 }
 
 void SqliteQuery::fetchResult() {
@@ -544,7 +1045,3 @@ SqliteQuery::~SqliteQuery() {
     if ( result != NULL ) sqlite3_finalize(stmt);
     unlock(); // unlock needs to be multiunlock safe
 }
-
-
-
-
