@@ -53,24 +53,42 @@
 // TODO:
 //extern "C" ...
 
-// TODO:
-//class SqliteEception : public std::exception {
+class SqliteException : public std::exception {
+    public:
+        // CHECK: passing the error message
+        SqliteException( char **errmsg, const std::string& error ) {
+            errorstr = error + " " + std::string(errmsg);
+            Logger::getLogger()->error( ("Sqlite : "+errorstr).c_str() );
+        }
+
+        ~SqliteException() throw() {
+        }
+
+        const char* what() const throw() {
+            return errorstr.c_str();
+        }
+
+    private:
+        std::string errorstr;
+};
 
 
 
-SqlitePersistence::SqlitePersistence() : conn(NULL) {
+SqlitePersistence::SqlitePersistence() : db(NULL), db_err(NULL) {
 }
 
 SqlitePersistence::~SqlitePersistence() {
-    if(conn! = NULL)
+    if(db! = NULL)
         shutdown();
 }
 
-bool SqlitePersistence::init(){
+bool SqlitePersistence::init() {
     // CHECK: I think the only thing needed to open a connection to a SQLite db is the db name (location)
     
     lock();
-    if(conn != NULL){
+
+    // CHECK: need to look into finding whether persistence is running.
+    if(db != NULL){
         Logger::getLogger()->warning("Persistence already running");
         unlock();
         return false;
@@ -89,15 +107,15 @@ bool SqlitePersistence::init(){
     std::string spass = conf->get("sqlite_pass");
     if(spass.length() != 0)
         pass = spass.c_str();
-    const char* db = NULL;
+    const char* database = NULL;
     std::string sdb = conf->get("sqlite_db");
     if(sdb.length() != 0)
-        db = sdb.c_str();
+        database = sdb.c_str();
     else{
         Logger::getLogger()->error("sqlite database name not specified");
         // TODO: Look into conn and its relevence to sqlite from mysql
         //sqlite3_close(db) // but db was never opened
-        conn = NULL;
+        db = NULL;
         unlock();
         return false;
     }
@@ -113,16 +131,17 @@ bool SqlitePersistence::init(){
 //        unlock();
 //        return false;
 //    }
-    
-    if (sqlite3_open(db, &db)){
-        Loggger::getLogger()->error("Can't open database: %s\n", sqlite3_errmsg(db));
+
+
+    if (sqlite3_open(database, &db)){
+        Logger::getLogger()->error("Can't open database: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
         unlock();
         return false;
     }
     
     // check for tables, create if necessary
-    char* db_err;
+    //char* db_err;
     sqlite3_exec(db, "SELECT * FROM tableversion;", NULL, 0, &db_err);
     if(db_err != NULL){
         // create tables
@@ -343,14 +362,189 @@ bool SqlitePersistence::init(){
         }
     }else{
         // check for tables to be updates.
-        
-        //NOTE TO SELF: left off at line 370
+        sqlite3_stmt stmt;
+        sqlite3_prepare_v2(db, "SELECT * FROM tableversion;", -1, &stmt, NULL);
+        if (sqlite3_step(stmt) == SQLITE_DONE){
+            Logger::getLogger()->error("Sqlite: table versions query result error");
+            Logger::getLogger()->error("You may need to delete the tables and start again");
+            sqlite3_close(db);
+            unlock();
+            return false;
+        }
+        //Possible central table updates
+        sqlite3_finalize(stmt);
+
+        try{
+            if(getTableVersion("tableversion") == 0){
+                Logger::getLogger()->error("Old database format detected.");
+                Logger::getLogger()->error("Incompatable old table formats and missing tables detected.");
+                Logger::getLogger()->error("Changes to most stored clcasses means tehre is no way to update from your current database to the newer format");
+                Logger::getLogger()->error("I cannot stress this enough: Please shutdown your game, delete the contents of the database and start again. Sorry");
+                Logger::getLogger()->error("Sqlite persistence NOT STARTED");
+                return false;
+            }
+            if(getTableVersion("gameinfo") == 0){
+                sqlite3_exec(db,"ALTER TABLE gameinfo ADD COLUMN turnname VARCHAR(50) NOT NULL;", NULL, 0, &db_err);
+                if(db_err != NULL){
+                    Logger::getLogger()->error("Can't alter gameinfo table, please reset the database");
+                    return false;
+                }
+            }
+        }catch(std::exception e){
+        }
+
     }
-    
+
+    unlock();
+
+    if(sqlite3_threadsafe()){
+        Logger::getLogger()->debug("Sqlite is thread safe");
+    }else{
+        Logger::getLogger()->debug("Sqlite is NOT thread safe");
+    }
+
+    return true;
 }
 
-sqlitepersistence::sqlitepersistence(const sqlitepersistence& orig) {
+void SqlitePersistence::shutdown(){
+    lock();
+    if(db != NULL){
+        sqlite3_close(db);
+        db = NULL;
+    }
+    unlock();
 }
+
+bool SqlitePersistence::saveGameInfo(){
+    lock();
+    char* db_err;
+    sqlite3_exec(db, "DELETE FROM gameinfo;", NULL, 0, &db_err);
+    unlock();
+    try{
+        std::ostringstream querybuilder;
+        Game* game = Game::getGame();
+        querybuilder << "INSERT INTO gameinfo VALUES ('" << addslashes(game->getKey()) << "', ";
+        querybuilder << game->getGameStartTime() << ", " << game->getTurnNumber();
+        querybuilder << ", '" << game->getTurnName() << "');";
+        sqlite3_exec(db, querybuilder.str() );
+    } catch (SqliteException& e ) {
+        return false;
+    }
+    return true;
+}
+
+bool SqlitePersistence::retrieveGameInfo(){
+    try {
+
+    }
+}
+
+// CHECK: importance of adding slashes to the name if the string is passed within quotes
+std::string SqlitePersistence::addslashes(const std::string& in) const{
+//    char* buf = new char[in.length() * 2 + 1];
+//    uint len = mysql_real_escape_string(conn, buf, in.c_str(), in.length());
+//    std::string rtv(buf, len);
+//    delete[] buf;
+    return in;
+}
+
+uint32_t SqlitePersistence::getTableVersion(const std::string& name){
+    try {
+        return valueQuery( "SELECT version FROM tableversion WHERE name='" + addslashes(name) + "';");
+    } catch( SqliteException& ) {
+        throw std::exception();
+    }
+}
+
+uint32_t SqlitePersistence::valueQuery( const std::string& query ) {
+    SqliteQuery q( conn, query );
+    if(q.validRow()){
+        return q.getInt(0);
+    }
+    return 0;
+}
+
+SqliteQuery::SqliteQuery( sqlite3* db, const std::string& new_query )
+: database( db ), result( NULL ), row( NULL ), query( new_query ), db_err( NULL )
+{
+    lock();
+    //sqlite3_stmt stmt;
+    if ( sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, NULL) != 0 ) {
+        unlock(); // Destructor WON'T get called if throw is in constructor
+        throw SqliteException(database,  "Query '"+query+"' failed!");
+    }
+
+}
+
+    const std::string SqliteQuery::get( uint32_t index ) {
+        if ( result == NULL )
+        {
+            fetchResult();
+            nextRow();
+        }
+        if ( row == NULL ) {
+            throw SqliteException( database, "Query '"+query+"' row empty!");
+        }
+        return row[index];
+  }
+
+int SqliteQuery::getInt( uint32_t index ) {
+    if ( result == NULL ) {
+        fetchResult();
+        nextRow();
+    }
+    if ( row == NULL ) {
+        throw SqliteException( database, "Query '"+query+"' row empty!");
+    }
+    if ( row[index] == NULL ){
+        throw SqliteException( database, "Int value is NULL");
+    }
+    return atoi(row[index]);
+}
+
+uint64_t SqliteQuery::getU64( uint32_t index ) {
+    if ( result == NULL ) {
+        fetchResult();
+        nextRow();
+    }
+    if ( row == NULL ) {
+        throw SqliteException( database, "Query '"+query+"' row empty!");
+    }
+    if ( row[index] == NULL ){
+        throw SqliteException( database, "UInt64 value is NULL");
+    }
+    return strtoull(row[index],NULL,10);
+}
+
+void SqliteQuery::fetchResult() {
+    //result = mysql_store_result(connection);
+    //if (result == NULL) //empty result or error
+    result = sqlite3_step(stmt);
+    if ( result != SQLITE_ROW ) {
+        throw SqliteException( database, "Query '"+query+"' result failed!");
+    }
+    unlock();
+}
+
+bool SqliteQuery::validRow() {
+    if ( result == NULL ) {
+        fetchResult();
+        nextRow();
+    }
+    return row != NULL;
+}
+
+bool SqliteQuery::nextRow() {
+    if ( result == NULL ) fetchResult();
+    row = (result == SQLITE_ROW);
+    return row;
+}
+
+SqliteQuery::~SqliteQuery() {
+    if ( result != NULL ) sqlite3_finalize(stmt);
+    unlock(); // unlock needs to be multiunlock safe
+}
+
 
 
 
