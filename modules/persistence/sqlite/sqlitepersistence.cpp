@@ -124,7 +124,7 @@ bool SqlitePersistence::init() {
     }
     
     const char* sock = NULL;
-    std::string ssock = conf->get("mysql_socket");
+    std::string ssock = conf->get("sqlite_socket");
     if(ssock.length() != 0)
         sock = ssock.c_str();
     int port = atoi(conf->get("sqlite_port").c_str());
@@ -837,7 +837,7 @@ Order* SqlitePersistence::retrieveOrder(uint32_t queueid, uint32_t ordid){
         std::ostringstream querybuilder;
         {
             querybuilder << "SELECT type,turns FROM ordertype WHERE queueid = " << queueid << " AND orderid = " << ordid << ";";
-            MysqlQuery query( conn, querybuilder.str() );
+            SqliteQuery query( db, querybuilder.str() );
 
             order = Game::getGame()->getOrderManager()->createOrder( query.getInt(0) );
             order->setTurns( query.getInt(1) );
@@ -848,7 +848,7 @@ Order* SqlitePersistence::retrieveOrder(uint32_t queueid, uint32_t ordid){
         {
             querybuilder.str("");
             querybuilder << "SELECT resourceid, amount FROM orderresource WHERE queueid=" << queueid << " AND orderid=" << ordid << ";";
-            MysqlQuery query( conn, querybuilder.str() );
+            SqliteQuery query( db, querybuilder.str() );
             while( query.nextRow() ){
                 order->addResource(query.getInt(0), query.getInt(1));
             }
@@ -1107,7 +1107,7 @@ Board::Ptr SqlitePersistence::retrieveBoard(uint32_t boardid){
     try {
         std::ostringstream querybuilder;
         querybuilder << "SELECT * FROM board WHERE boardid = " << boardid << ";";
-        MysqlQuery query( conn, querybuilder.str() );
+        SqliteQuery query( db, querybuilder.str() );
         Board::Ptr board( new Board( boardid, query.get(1), query.get(2) ) );
         board->setPersistenceData(query.getInt(3),query.getU64(4));
         return board;
@@ -1478,7 +1478,7 @@ bool SqlitePersistence::saveDesign(Design::Ptr design){
             singleQuery( querybuilder.str() );
         }
         return true;
-    } catch( MysqlException& ) {
+    } catch( SqliteException& ) {
         return false;
     }
 }
@@ -1745,7 +1745,7 @@ bool SqlitePersistence::saveObjectView(uint32_t playerid, ObjectView::Ptr ov){
     }
 }
 
-ObjectView::Ptr MysqlPersistence::retrieveObjectView(uint32_t playerid, uint32_t objectid, uint32_t turn){
+ObjectView::Ptr SqlitePersistence::retrieveObjectView(uint32_t playerid, uint32_t objectid, uint32_t turn){
     try {
         std::ostringstream querybuilder;
         querybuilder << "SELECT * FROM playerobjectview WHERE playerid = " << playerid << " AND objectid = " << objectid << " AND turnnum <= " << turn << " ORDER BY turnnum DESC LIMIT 1;";
@@ -1928,6 +1928,311 @@ uint32_t SqlitePersistence::getTableVersion(const std::string& name){
     }
 }
 
+bool SqlitePersistence::updatePosition3dObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, Position3dObjectParam* pob){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM objectparamposition WHERE objectid = " << objid << " AND turn = " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << ";";
+    singleQuery( querybuilder.str() );
+    querybuilder.str("");
+    querybuilder << "INSERT INTO objectparamposition VALUES(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", " << pob->getPosition().getX() << ", " << pob->getPosition().getY() << ", " << pob->getPosition().getZ() << ", " << pob->getRelative() << ");";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrievePosition3dObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, Position3dObjectParam* pob){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT posx,posy,posz,relative FROM objectparamposition WHERE objectid = " << objid << " AND turn <= " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << " ORDER BY turn DESC LIMIT 1;";
+    SqliteQuery query( db, querybuilder.str() );
+    pob->setPosition(Vector3d(strtoll(query.get(0).c_str(), NULL, 10), strtoll(query.get(1).c_str(), NULL, 10), strtoll(query.get(2).c_str(), NULL, 10)));
+    pob->setRelative(query.getInt(3));
+    return true;
+}
+
+bool SqlitePersistence::updateVelocity3dObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, Velocity3dObjectParam* vob){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM objectparamvelocity WHERE objectid = " << objid << " AND turn = " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << ";";
+    singleQuery( querybuilder.str() );
+    querybuilder.str("");
+    querybuilder << "INSERT INTO objectparamvelocity VALUES(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", " << vob->getVelocity().getX() << ", " << vob->getVelocity().getY() << ", " << vob->getVelocity().getZ() << ", " << vob->getRelative() << ");";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveVelocity3dObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, Velocity3dObjectParam* vob){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT velx,vely,velz,relative FROM objectparamvelocity WHERE objectid = " << objid << " AND turn <= " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << " ORDER BY turn DESC LIMIT 1;";
+    SqliteQuery query( db, querybuilder.str() );
+    vob->setVelocity(Vector3d(strtoll(query.get(0).c_str(), NULL, 10), strtoll(query.get(1).c_str(), NULL, 10), strtoll(query.get(2).c_str(), NULL, 10)));
+    vob->setRelative(query.getInt(3));
+    return true;
+}
+
+bool SqlitePersistence::updateOrderQueueObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, OrderQueueObjectParam* oob){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM objectparamorderqueue WHERE objectid = " << objid << " AND turn = " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << ";";
+    singleQuery( querybuilder.str() );
+    querybuilder.str("");
+    querybuilder << "INSERT INTO objectparamorderqueue VALUES(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", " << oob->getQueueId() << ");";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveOrderQueueObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, OrderQueueObjectParam* oob){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT queueid FROM objectparamorderqueue WHERE objectid = " << objid << " AND turn <= " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << " ORDER BY turn DESC LIMIT 1;";
+    oob->setQueueId(valueQuery( querybuilder.str()));
+    return true;
+}
+
+bool SqlitePersistence::updateResourceListObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, ResourceListObjectParam* rob){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM objectparamresourcelist WHERE objectid = " << objid << " AND turn = " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << ";";
+    singleQuery( querybuilder.str() );
+    querybuilder.str("");
+    std::map<uint32_t, std::pair<uint32_t, uint32_t> > reslist = rob->getResources();
+    querybuilder << "INSERT INTO objectparamresourcelist VALUES ";
+    for(std::map<uint32_t, std::pair<uint32_t, uint32_t> >::iterator itcurr = reslist.begin();
+            itcurr != reslist.end(); ++itcurr){
+        if(itcurr != reslist.begin()){
+            querybuilder << ", ";
+        }
+        querybuilder << "(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", " << itcurr->first << ", " << itcurr->second.first << ", " << itcurr->second.second << ")";
+    }
+    if(reslist.size() == 0){
+        //fake resource to make sure there is something, removed when retreived.
+        querybuilder << "(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", 0, 0, 0)";
+    }
+    querybuilder << ";";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveResourceListObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, ResourceListObjectParam* rob){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT resid, available, possible FROM objectparamresourcelist WHERE objectid = " << objid;
+    querybuilder << " AND turn = (SELECT MAX(turn) FROM objectparamresourcelist WHERE objectid = " << objid;
+    querybuilder << " AND turn <= " << turn << " AND playerid = " << plid;
+    querybuilder << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos;
+    querybuilder << ") AND playerid = " << plid << " AND paramgroupid = " << pgroup;
+    querybuilder << " AND paramgrouppos = " << pgpos << ";";
+    SqliteQuery query( db, querybuilder.str() );
+
+    std::map<uint32_t, std::pair<uint32_t, uint32_t> > reslist;
+    while(query.nextRow()){
+        uint32_t available = query.getInt(1);
+        uint32_t possible = query.getInt(2);
+        if(available != 0 || possible != 0){
+            reslist[query.getInt(0)] = std::pair<uint32_t, uint32_t>(available, possible);
+        }
+    }
+    rob->setResources(reslist);
+    return true;
+}
+
+bool SqlitePersistence::updateReferenceObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, ReferenceObjectParam* rob){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM objectparamreference WHERE objectid = " << objid << " AND turn = " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << ";";
+    singleQuery( querybuilder.str() );
+    querybuilder.str("");
+    querybuilder << "INSERT INTO objectparamreference VALUES(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", " << rob->getReferenceType() << ", " << rob->getReferencedId() << ");";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveReferenceObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, ReferenceObjectParam* rob){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT reftype, refval FROM objectparamreference WHERE objectid = " << objid << " AND turn <= " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << " ORDER BY turn DESC LIMIT 1;";
+    SqliteQuery query( db, querybuilder.str() );
+    rob->setReferenceType(query.getInt(0));
+    rob->setReferencedId(query.getInt(1));
+    return true;
+}
+
+bool SqlitePersistence::updateRefQuantityListObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, RefQuantityListObjectParam* rob){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM objectparamrefquantitylist WHERE objectid = " << objid << " AND turn = " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << ";";
+    singleQuery( querybuilder.str() );
+    querybuilder.str("");
+    std::map<std::pair<int32_t, uint32_t>, uint32_t> reflist = rob->getRefQuantityList();
+    querybuilder << "INSERT INTO objectparamrefquantitylist VALUES ";
+    for(std::map<std::pair<int32_t, uint32_t>, uint32_t>::iterator itcurr = reflist.begin();
+            itcurr != reflist.end(); ++itcurr){
+        if(itcurr != reflist.begin()){
+            querybuilder << ", ";
+        }
+        querybuilder << "(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", " << itcurr->first.first << ", " << itcurr->first.second << ", " << itcurr->second << ")";
+    }
+    if(reflist.size() == 0){
+        //fake refquantity to make sure there is something, removed when retreived.
+        querybuilder << "(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", 0, 0, 0)";
+    }
+    querybuilder << ";";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveRefQuantityListObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, RefQuantityListObjectParam* rob){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT reftype, refid, quant FROM objectparamrefquantitylist WHERE objectid = " << objid << " AND turn = (SELECT MAX(turn) FROM objectparamrefquantitylist WHERE objectid = " << objid;
+    querybuilder << " AND turn <= " << turn << " AND playerid = " << plid;
+    querybuilder << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos;
+    querybuilder << ") AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << ";";
+    SqliteQuery query( db, querybuilder.str() );
+    std::map<std::pair<int32_t, uint32_t>, uint32_t> reflist;
+    while(query.nextRow()){
+        int32_t reftype = query.getInt(0);
+        uint32_t refid = query.getInt(1);
+        uint32_t quant = query.getInt(2);
+        if(reftype != 0 && refid != 0 && quant != 0){
+            reflist[std::pair<int32_t, uint32_t>(reftype, refid)] = quant;
+        }
+    }
+    rob->setRefQuantityList(reflist);
+    return true;
+}
+
+bool SqlitePersistence::updateIntegerObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, IntegerObjectParam* iob){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM objectparaminteger WHERE objectid = " << objid << " AND turn = " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << ";";
+    singleQuery( querybuilder.str() );
+    querybuilder.str("");
+    querybuilder << "INSERT INTO objectparaminteger VALUES(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", " << iob->getValue() << ");";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveIntegerObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, IntegerObjectParam* iob){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT val FROM objectparaminteger WHERE objectid = " << objid << " AND turn <= " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << " ORDER BY turn DESC LIMIT 1;";
+    iob->setValue( valueQuery( querybuilder.str()));
+    return true;
+}
+
+bool SqlitePersistence::updateSizeObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, SizeObjectParam* sob){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM objectparamsize WHERE objectid = " << objid << " AND turn = " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << ";";
+    singleQuery( querybuilder.str() );
+    querybuilder.str("");
+    querybuilder << "INSERT INTO objectparamsize VALUES(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", " << sob->getSize() << ");";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveSizeObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, SizeObjectParam* sob){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT size FROM objectparamsize WHERE objectid = " << objid << " AND turn <= " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << " ORDER BY turn DESC LIMIT 1;";
+    SqliteQuery query( db, querybuilder.str() );
+    sob->setSize(query.getU64(0));
+    return true;
+}
+
+bool SqlitePersistence::updateMediaObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, MediaObjectParam* mob){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM objectparammedia WHERE objectid = " << objid << " AND turn = " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << ";";
+    singleQuery( querybuilder.str() );
+    querybuilder.str("");
+    querybuilder << "INSERT INTO objectparammedia VALUES(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", '" << mob->getMediaUrl() << "');";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveMediaObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, MediaObjectParam* mob){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT url FROM objectparammedia WHERE objectid = " << objid << " AND turn <= " << turn << " AND playerid = " << plid << " AND paramgroupid = " << pgroup << " AND paramgrouppos = " << pgpos << " ORDER BY turn DESC LIMIT 1;";
+    SqliteQuery query( db, querybuilder.str() );
+    mob->setMediaUrl(query.get(0));
+    return true;
+}
+
+void SqlitePersistence::lock(){
+    SqliteQuery::lock();
+}
+
+void SqlitePersistence::unlock(){
+    SqliteQuery::unlock();
+}
+
+void SqlitePersistence::idSetToStream( std::ostringstream& stream, const uint32_t id, const IdSet& idset ) const {
+    for ( IdSet::const_iterator it = idset.begin(); it != idset.end(); ++it ) {
+        if ( it != idset.begin() ) stream << ", ";
+        stream << "(" << id << ", " << (*it) << ")";
+    }
+}
+
+void SqlitePersistence::idSetToStream( std::ostringstream& stream, const uint32_t id, const uint32_t id2, const IdSet& idset ) const {
+    for ( IdSet::const_iterator it = idset.begin(); it != idset.end(); ++it ) {
+        if ( it != idset.begin() ) stream << ", ";
+        stream << "(" << id << ", " << id2 << ", " << (*it) << ")";
+    }
+}
+
+void SqlitePersistence::idListToStream( std::ostringstream& stream, const uint32_t id, const IdList& idlist ) const {
+    uint32_t slotnum = 0;
+    for(IdList::const_iterator it = idlist.begin(); it != idlist.end(); ++it) {
+        if ( it != idlist.begin() ) stream << ", ";
+        stream << "(" << id << ", " << slotnum << ", " << (*it) << ")";
+        slotnum++;
+    }
+}
+
+void SqlitePersistence::idMapToStream( std::ostringstream& stream, const uint32_t id, const IdMap& idmap ) const {
+    for ( IdMap::const_iterator it = idmap.begin(); it != idmap.end(); ++it ) {
+        if ( it != idmap.begin() ) stream << ", ";
+        stream << "(" << id << ", " << it->first << ", " << it->second << ")";
+    }
+}
+
+void SqlitePersistence::idMapToStream( std::ostringstream& stream, const uint32_t id, const uint32_t id2, const IdMap& idmap ) const {
+    for ( IdMap::const_iterator it = idmap.begin(); it != idmap.end(); ++it ) {
+        if ( it != idmap.begin() ) stream << ", ";
+        stream << "(" << id << ", " << id2 << ", " << it->first << ", " << it->second << ")";
+    }
+}
+
+void  SqlitePersistence::insertSet ( const std::string& table, uint32_t id, const IdSet& idset ) {
+    if (idset.empty()) return;
+    std::ostringstream query;
+    query << "INSERT INTO " << table << " VALUES ";
+    idSetToStream( query, id, idset );
+    query << ";";
+    singleQuery( query.str() );
+}
+
+void  SqlitePersistence::insertSet ( const std::string& table, uint32_t id, uint32_t id2, const IdSet& idset ) {
+    if (idset.empty()) return;
+    std::ostringstream query;
+    query << "INSERT INTO " << table << " VALUES ";
+    idSetToStream( query, id, id2, idset );
+    query << ";";
+    singleQuery( query.str() );
+}
+
+void  SqlitePersistence::insertList( const std::string& table, uint32_t id, const IdList& idlist ) {
+    if (idlist.empty()) return;
+    std::ostringstream query;
+    query << "INSERT INTO " << table << " VALUES ";
+    idListToStream( query, id, idlist );
+    query << ";";
+    singleQuery( query.str() );
+}
+
+void  SqlitePersistence::insertMap ( const std::string& table, uint32_t id, const IdMap& idmap ){
+    if (idmap.empty()) return;
+    std::ostringstream query;
+    query << "INSERT INTO " << table << " VALUES ";
+    idMapToStream( query, id, idmap );
+    query << ";";
+    singleQuery( query.str() );
+}
+
+void  SqlitePersistence::insertMap ( const std::string& table, uint32_t id, uint32_t id2, const IdMap& idmap ){
+    if (idmap.empty()) return;
+    std::ostringstream query;
+    query << "INSERT INTO " << table << " VALUES ";
+    idMapToStream( query, id, id2, idmap );
+    query << ";";
+    singleQuery( query.str() );
+}
+
 void SqlitePersistence::singleQuery( const std::string& query ) {
     SqliteQuery q( db, query );
 }
@@ -1939,6 +2244,34 @@ uint32_t SqlitePersistence::valueQuery( const std::string& query ) {
     }
     return 0;
 }
+
+const IdSet SqlitePersistence::idSetQuery( const std::string& query ) {
+    SqliteQuery q( db, query );
+    IdSet set;
+    while(q.nextRow()){
+        set.insert(q.getInt(0));
+    }
+    return set;
+}
+
+const IdList SqlitePersistence::idListQuery( const std::string& query ) {
+    SqliteQuery q( db, query );
+    IdList list;
+    while(q.nextRow()){
+        list.push_back(q.getInt(0));
+    }
+    return list;
+}
+
+const IdMap SqlitePersistence::idMapQuery( const std::string& query ) {
+    SqliteQuery q( conn, query );
+    IdMap map;
+    while(q.nextRow()){
+        map[ q.getInt(0) ] = q.getInt(1);
+    }
+    return map;
+}
+
 
 SqliteQuery::SqliteQuery( sqlite3* db, const std::string& new_query )
 : database( db ), result( NULL ), row( NULL ), query( new_query ), db_err( NULL )

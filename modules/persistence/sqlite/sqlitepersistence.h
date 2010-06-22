@@ -115,6 +115,7 @@ public:
 
     std::string addslashes(const std::string& in) const;
     uint32_t getTableVersion(const std::string& name);
+
 private:
 
     bool updateSpaceCoordParam(uint32_t queueid, uint32_t ordid, uint32_t pos, SpaceCoordParam* scp);
@@ -132,13 +133,49 @@ private:
     bool updateTimeParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, TimeParameter* tp);
     bool retrieveTimeParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, TimeParameter* tp);
     bool removeTimeParameter(uint32_t queueid, uint32_t ordid, uint32_t pos);
+
+    bool updatePosition3dObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, Position3dObjectParam* pob);
+    bool retrievePosition3dObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, Position3dObjectParam* pob);
+    bool updateVelocity3dObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, Velocity3dObjectParam* vob);
+    bool retrieveVelocity3dObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, Velocity3dObjectParam* vob);
+    bool updateOrderQueueObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, OrderQueueObjectParam* oob);
+    bool retrieveOrderQueueObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, OrderQueueObjectParam* oob);
+    bool updateResourceListObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, ResourceListObjectParam* rob);
+    bool retrieveResourceListObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, ResourceListObjectParam* rob);
+    bool updateReferenceObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, ReferenceObjectParam* rob);
+    bool retrieveReferenceObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, ReferenceObjectParam* rob);
+    bool updateRefQuantityListObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, RefQuantityListObjectParam* rob);
+    bool retrieveRefQuantityListObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, RefQuantityListObjectParam* rob);
+    bool updateIntegerObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, IntegerObjectParam* iob);
+    bool retrieveIntegerObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, IntegerObjectParam* iob);
+    bool updateSizeObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, SizeObjectParam* sob);
+    bool retrieveSizeObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, SizeObjectParam* sob);
+    bool updateMediaObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, MediaObjectParam* mob);
+    bool retrieveMediaObjectParam(uint32_t objid, uint32_t turn, uint32_t plid, uint32_t pgroup, uint32_t pgpos, MediaObjectParam* mob);
+
         void lock();
         void unlock();
         sqlite3* db;
         char* db_err;
 
+    void idSetToStream( std::ostringstream& stream, const uint32_t id, const IdSet& idset ) const;
+    void idSetToStream( std::ostringstream& stream, const uint32_t id, const uint32_t id2, const IdSet& idset ) const;
+    void idListToStream( std::ostringstream& stream, const uint32_t id, const IdList& idlist ) const;
+    void idMapToStream( std::ostringstream& stream, const uint32_t id, const IdMap& idmap ) const;
+    void idMapToStream( std::ostringstream& stream, const uint32_t id, const uint32_t id2, const IdMap& idmap ) const;
+
+    void insertSet ( const std::string& table, uint32_t id, const IdSet& idset );
+    void insertSet ( const std::string& table, uint32_t id, uint32_t id2, const IdSet& idset );
+    void insertList( const std::string& table, uint32_t id, const IdList& idlist );
+    void insertMap ( const std::string& table, uint32_t id, const IdMap& idmap );
+    void insertMap ( const std::string& table, uint32_t id, uint32_t id2, const IdMap& idmap );
+
     void singleQuery( const std::string& query );
     uint32_t valueQuery( const std::string& query );
+
+    const IdSet idSetQuery( const std::string& query );
+    const IdList idListQuery( const std::string& query );
+    const IdMap idMapQuery( const std::string& query );
 
 };
 
