@@ -931,8 +931,983 @@ bool SqlitePersistence::removeOrder(uint32_t queueid, uint32_t ordid){
         }
         delete order;
         return true;
-    } catch( MysqlException& ) {
+    } catch( SqliteException& e) {
         return false; 
+    }
+}
+
+bool SqlitePersistence::updateSpaceCoordParam(uint32_t queueid, uint32_t ordid, uint32_t pos, SpaceCoordParam* scp){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM orderparamspace WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position=" << pos << ";";
+    singleQuery( querybuilder.str() );
+
+    querybuilder.str("");
+    querybuilder << "INSERT INTO orderparamspace VALUES (" << queueid << ", " << ordid << ", " << pos << ", ";
+    querybuilder << scp->getPosition().getX() << ", " << scp->getPosition().getY() << ", ";
+    querybuilder << scp->getPosition().getZ() <<");";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveSpaceCoordParam(uint32_t queueid, uint32_t ordid, uint32_t pos, SpaceCoordParam* scp){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT posx,posy,posz FROM orderparamspace WHERE queueid = " << queueid << " AND orderid = " << ordid << " AND position = " << pos << ";";
+    SqliteQuery query( db, querybuilder.str() );
+    scp->setPosition(Vector3d(atoll(query.get(0).c_str()), atoll(query.get(1).c_str()), atoll(query.get(2).c_str())));
+    return true;
+}
+
+bool SqlitePersistence::removeSpaceCoordParam(uint32_t queueid, uint32_t ordid, uint32_t pos){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM orderparamspace WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position=" << pos << ";";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::updateListParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, ListParameter* lp){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM orderparamlist WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position=" << pos << ";";
+    singleQuery( querybuilder.str() );
+
+    IdMap list = lp->getList();
+    if(!list.empty()){
+        querybuilder.str("");
+        querybuilder << "INSERT INTO orderparamlist VALUES ";
+        for(IdMap::iterator itcurr = list.begin(); itcurr != list.end(); ++itcurr){
+            if(itcurr != list.begin())
+                querybuilder << ", ";
+            querybuilder << "(" << queueid << ", " << ordid << ", " << pos << ", " << (*itcurr).first << ", " << (*itcurr).second << ")";
+        }
+        querybuilder << ";";
+        singleQuery( querybuilder.str() );
+    }
+    return true;
+}
+
+bool SqlitePersistence::retrieveListParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, ListParameter* lp){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT listid, amount FROM orderparamlist WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position = " << pos << ";";
+    lp->setList( idMapQuery( querybuilder.str() ) );
+    return true;
+}
+
+bool SqlitePersistence::removeListParameter(uint32_t queueid, uint32_t ordid, uint32_t pos){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM orderparamlist WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position=" << pos << ";";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::updateObjectOrderParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, ObjectOrderParameter* ob){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM orderparamobject WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position=" << pos << ";";
+    singleQuery( querybuilder.str() );
+
+    querybuilder.str("");
+    querybuilder << "INSERT INTO orderparamobject VALUES (" << queueid << ", " << ordid << ", " << pos << ", ";
+    querybuilder << ob->getObjectId() << ");";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveObjectOrderParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, ObjectOrderParameter* ob) {
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT objectid FROM orderparamobject WHERE queueid=" << queueid << " AND orderid = " << ordid << " AND position = " << pos << ";";
+    ob->setObjectId(valueQuery( querybuilder.str() ));
+    return true;
+}
+
+bool SqlitePersistence::removeObjectOrderParameter(uint32_t queueid, uint32_t ordid, uint32_t pos){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM orderparamobject WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position=" << pos << ";";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::updateStringParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, StringParameter* st){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM orderparamstring WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position=" << pos << ";";
+    singleQuery( querybuilder.str() );
+
+    querybuilder.str("");
+    querybuilder << "INSERT INTO orderparamstring VALUES (" << queueid << ", " << ordid << ", " << pos << ", '";
+    querybuilder << addslashes(st->getString()) <<"');";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveStringParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, StringParameter* st){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT thestring FROM orderparamstring WHERE queueid=" << queueid << " AND orderid = " << ordid << " AND position = " << pos << ";";
+    SqliteQuery query( db, querybuilder.str() );
+    st->setString( query.get(0));
+    return true;
+}
+
+bool SqlitePersistence::removeStringParameter(uint32_t queueid, uint32_t ordid, uint32_t pos){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM orderparamstring WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position=" << pos << ";";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::updateTimeParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, TimeParameter* tp){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM orderparamtime WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position=" << pos << ";";
+    singleQuery( querybuilder.str() );
+
+    querybuilder.str("");
+    querybuilder << "INSERT INTO orderparamtime VALUES (" << queueid << ", " << ordid << ", " << pos << ", ";
+    querybuilder << tp->getTime() <<");";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::retrieveTimeParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, TimeParameter* tp){
+    std::ostringstream querybuilder;
+    querybuilder << "SELECT turns FROM orderparamtime WHERE queueid=" << queueid << " AND orderid = " << ordid << " AND position = " << pos << ";";
+    tp->setTime( valueQuery( querybuilder.str() ) );
+    return true;
+}
+
+bool SqlitePersistence::removeTimeParameter(uint32_t queueid, uint32_t ordid, uint32_t pos){
+    std::ostringstream querybuilder;
+    querybuilder << "DELETE FROM orderparamtime WHERE queueid=" << queueid << " AND orderid=" << ordid << " AND position=" << pos << ";";
+    singleQuery( querybuilder.str() );
+    return true;
+}
+
+bool SqlitePersistence::saveBoard(Board::Ptr board){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "INSERT INTO board VALUES (" << board->getId() << ", '" << addslashes(board->getName()) << "', '";
+        querybuilder << addslashes(board->getDescription()) << "', " << board->getNumMessages() << ", ";
+        querybuilder << board->getModTime() <<");";
+        singleQuery( querybuilder.str() );
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+bool SqlitePersistence::updateBoard(Board::Ptr board){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "UPDATE board SET name='" << addslashes(board->getName()) << "', description='" << addslashes(board->getDescription());
+        querybuilder << "', nummessages=" << board->getNumMessages() << ", modtime=" << board->getModTime();
+        querybuilder << " WHERE boardid=" << board->getId() << ";";
+        singleQuery( querybuilder.str() );
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+Board::Ptr SqlitePersistence::retrieveBoard(uint32_t boardid){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "SELECT * FROM board WHERE boardid = " << boardid << ";";
+        MysqlQuery query( conn, querybuilder.str() );
+        Board::Ptr board( new Board( boardid, query.get(1), query.get(2) ) );
+        board->setPersistenceData(query.getInt(3),query.getU64(4));
+        return board;
+    } catch( SqliteException& ) {
+        return Board::Ptr();
+    }
+}
+
+uint32_t SqlitePersistence::getMaxBoardId(){
+    try {
+        return valueQuery( "SELECT MAX(boardid) FROM board;" );
+    } catch( SqliteException& ) {
+        return 0;
+    }
+}
+
+IdSet SqlitePersistence::getBoardIds(){
+    try {
+        return idSetQuery( "SELECT boardid FROM board;" );
+    } catch( SqliteException& ) {
+        return IdSet();
+    }
+}
+
+bool SqlitePersistence::saveMessage( boost::shared_ptr< Message > msg){
+    try {
+        uint32_t msgid = msg->getId();
+        std::ostringstream querybuilder;
+        querybuilder << "INSERT INTO message VALUES (" << msgid << ", '" << addslashes(msg->getSubject()) << "', '";
+        querybuilder << addslashes(msg->getBody()) << "', " << msg->getTurn() << ");";
+        singleQuery( querybuilder.str() );
+
+        Message::References refs = msg->getReferences();
+        if(!refs.empty()){
+            querybuilder.str("");
+            querybuilder << "INSERT INTO messagereference VALUES ";
+            for(Message::References::iterator itcurr = refs.begin(); itcurr != refs.end(); ++itcurr){
+                if(itcurr != refs.begin())
+                    querybuilder << ", ";
+                querybuilder << "(" << msgid << ", " << (*itcurr).first << ", " << (*itcurr).second << ")";
+            }
+            singleQuery( querybuilder.str() );
+        }
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+boost::shared_ptr< Message > SqlitePersistence::retrieveMessage(uint32_t msgid){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "SELECT * FROM message WHERE messageid = " << msgid << ";";
+        Message::Ptr msg;
+        {
+            SqliteQuery query( db, querybuilder.str() );
+            msg.reset( new Message() );
+            msg->setSubject( query.get(1) );
+            msg->setBody( query.get(2) );
+            msg->setTurn( query.getInt(3) );
+        }
+
+        querybuilder.str("");
+        querybuilder << "SELECT type,refid FROM messagereference WHERE messageid = " << msgid << ";";
+        {
+            SqliteQuery query( db, querybuilder.str() );
+            while(query.nextRow()){
+                msg->addReference((RefSysType)query.getInt(0),query.getInt(1));
+            }
+        }
+        return msg;
+    } catch( SqliteException& ) {
+        return Message::Ptr();
+    }
+}
+
+bool SqlitePersistence::removeMessage(uint32_t msgid){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "DELETE FROM message WHERE messageid=" << msgid << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM messagereference WHERE messageid=" << msgid << ";";
+        singleQuery( querybuilder.str() );
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+bool SqlitePersistence::saveMessageList(uint32_t bid, IdList list){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "DELETE FROM messageslot WHERE boardid=" << bid <<";";
+        singleQuery( querybuilder.str() );
+        insertList( "messageslot", bid, list );
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+IdList SqlitePersistence::retrieveMessageList(uint32_t bid){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "SELECT messageid FROM messageslot WHERE boardid=" << bid <<" ORDER BY slot;";
+        return idListQuery( querybuilder.str() );
+    } catch( SqliteException& ) {
+        return IdList();
+    }
+}
+
+uint32_t SqlitePersistence::getMaxMessageId(){
+    try {
+        return valueQuery( "SELECT MAX(messageid) FROM message;" );
+    } catch( SqliteException& ) {
+        return 0;
+    }
+}
+
+bool SqlitePersistence::saveResource(ResourceDescription::Ptr res){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "INSERT INTO resourcedesc VALUES (" << res->getResourceType() << ", '" << addslashes(res->getNameSingular()) << "', '";
+        querybuilder << addslashes(res->getNamePlural()) << "', '" << addslashes(res->getUnitSingular()) << "', '";
+        querybuilder << addslashes(res->getUnitPlural()) << "', '" << addslashes(res->getDescription()) << "', ";
+        querybuilder << res->getMass() << ", " << res->getVolume() << ", " << res->getModTime() << ");";
+        singleQuery( querybuilder.str() );
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+ResourceDescription::Ptr SqlitePersistence::retrieveResource(uint32_t restype){
+    ResourceDescription::Ptr res;
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "SELECT * FROM resourcedesc WHERE resourcetype = " << restype << ";";
+        SqliteQuery query( db, querybuilder.str() );
+
+        res.reset( new ResourceDescription() );
+        res->setResourceType(restype);
+        res->setNameSingular(query.get(1));
+        res->setNamePlural(query.get(2));
+        res->setUnitSingular(query.get(3));
+        res->setUnitPlural(query.get(4));
+        res->setDescription(query.get(5));
+        res->setMass(query.getInt(6));
+        res->setVolume(query.getInt(7));
+        res->setModTime(query.getU64(8));
+        return res;
+    } catch( SqliteException& ) {
+        return ResourceDescription::Ptr();
+    }
+}
+
+uint32_t SqlitePersistence::getMaxResourceId(){
+    try {
+        return valueQuery( "SELECT MAX(resourcetype) FROM resourcedesc;" );
+    } catch( SqliteException& ) {
+        return 0;
+    }
+}
+
+IdSet SqlitePersistence::getResourceIds(){
+    try {
+        return idSetQuery( "SELECT resourcetype FROM resourcedesc;" );
+    } catch( SqliteException& ) {
+        return IdSet();
+    }
+}
+
+bool SqlitePersistence::savePlayer(Player::Ptr player){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "INSERT INTO player VALUES (" << player->getID() << ", '" << addslashes(player->getName()) << "', '";
+        querybuilder << addslashes(player->getPass()) << "', '" << addslashes(player->getEmail()) << "', '";
+        querybuilder << addslashes(player->getComment()) << "', " << player->getBoardId() << ", ";
+        querybuilder << ((player->isAlive()) ? 1 : 0) << ", " << player->getModTime() << ");";
+        singleQuery( querybuilder.str() );
+
+        PlayerView::Ptr playerview = player->getPlayerView();
+        insertMap( "playerscore", player->getID(), player->getAllScores() );
+        insertSet( "playerdesignusable", player->getID(), playerview->getUsableDesigns() );
+        insertSet( "playercomponentusable", player->getID(), playerview->getUsableComponents() );
+        insertSet( "playerobjectowned", player->getID(), playerview->getOwnedObjects() );
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+bool SqlitePersistence::updatePlayer(Player::Ptr player){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "UPDATE player SET name='" << addslashes(player->getName()) << "', password='" << addslashes(player->getPass());
+        querybuilder << "', email='" << addslashes(player->getEmail()) << "', comment='" << addslashes(player->getComment());
+        querybuilder << "', boardid=" << player->getBoardId() << ", alive=" << ((player->isAlive()) ? 1 : 0);
+        querybuilder << ", modtime=" << player->getModTime() << " WHERE playerid=" << player->getID() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM playerscore WHERE playerid=" << player->getID() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM playerdesignusable WHERE playerid=" << player->getID() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM playercomponentusable WHERE playerid=" << player->getID() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM playerobjectowned WHERE playerid=" << player->getID() << ";";
+        singleQuery( querybuilder.str() );
+
+        PlayerView::Ptr playerview = player->getPlayerView();
+        insertMap( "playerscore", player->getID(), player->getAllScores() );
+        insertSet( "playerdesignusable", player->getID(), playerview->getUsableDesigns() );
+        insertSet( "playercomponentusable", player->getID(), playerview->getUsableComponents() );
+        insertSet( "playerobjectowned", player->getID(), playerview->getOwnedObjects() );
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+Player::Ptr SqlitePersistence::retrievePlayer(uint32_t playerid){
+    Player::Ptr player;
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "SELECT * FROM player WHERE playerid = " << playerid << ";";
+        {
+            SqliteQuery query( db, querybuilder.str() );
+
+            player.reset( new Player( playerid, query.get(1), query.get(2)) );
+            player->setEmail(query.get(3));
+            player->setComment(query.get(4));
+            player->setBoardId(query.getInt(5));
+            player->setIsAlive(query.getInt(6) == 1);
+            player->setModTime(query.getU64(7));
+        }
+        {
+            querybuilder.str("");
+            querybuilder << "SELECT * FROM playerscore WHERE playerid = " << playerid << ";";
+            SqliteQuery query( db, querybuilder.str() );
+            while(query.nextRow()){
+                player->setScore( query.getInt(1), query.getInt(2) );
+            }
+        }
+        PlayerView::Ptr playerview = player->getPlayerView();
+        querybuilder.str("");
+        querybuilder << "SELECT designid FROM playerdesignview WHERE playerid = " << playerid << ";";
+        playerview->setVisibleDesigns( idSetQuery( querybuilder.str() ) );
+
+        querybuilder.str("");
+        querybuilder << "SELECT designid FROM playerdesignusable WHERE playerid = " << playerid << ";";
+        playerview->setUsableDesigns( idSetQuery( querybuilder.str() ) );
+
+        querybuilder.str("");
+        querybuilder << "SELECT componentid FROM playercomponentview WHERE playerid = " << playerid << ";";
+        playerview->setVisibleComponents( idSetQuery( querybuilder.str() ) );
+
+        querybuilder.str("");
+        querybuilder << "SELECT componentid FROM playercomponentusable WHERE playerid = " << playerid << ";";
+        playerview->setUsableComponents( idSetQuery( querybuilder.str() ) );
+
+        querybuilder.str("");
+        querybuilder << "SELECT DISTINCT objectid FROM playerobjectview WHERE playerid = " << playerid << ";";
+        playerview->setVisibleObjects( idSetQuery( querybuilder.str() ) );
+
+        querybuilder.str("");
+        querybuilder << "SELECT objectid FROM playerobjectowned WHERE playerid = " << playerid << ";";
+        playerview->setOwnedObjects( idSetQuery( querybuilder.str() ) );
+
+        return player;
+    } catch( SqliteException& ) {
+        return Player::Ptr();
+    }
+}
+
+uint32_t SqlitePersistence::getMaxPlayerId(){
+    try {
+        return valueQuery( "SELECT MAX(playerid) FROM player;" );
+    } catch( SqliteException& ) {
+        return 0;
+    }
+}
+
+IdSet SqlitePersistence::getPlayerIds(){
+    try {
+        return idSetQuery( "SELECT playerid FROM player;" );
+    } catch( SqliteException& ) {
+        return IdSet();
+    }
+}
+
+bool SqlitePersistence::saveCategory(Category::Ptr cat){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "INSERT INTO category VALUES (" << cat->getCategoryId() << ", '" << cat->getName() << "', '";
+        querybuilder << cat->getDescription() << "', " << cat->getModTime() << ");";
+        singleQuery( querybuilder.str() );
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+Category::Ptr SqlitePersistence::retrieveCategory(uint32_t catid){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "SELECT * FROM category WHERE categoryid = " << catid << ";";
+        SqliteQuery query( db, querybuilder.str() );
+        Category::Ptr cat( new Category() );
+        cat->setCategoryId(catid);
+        cat->setName(query.get(1));
+        cat->setDescription(query.get(2));
+        cat->setModTime(query.getU64(3));
+        return cat;
+    } catch( SqliteException& ) {
+        return Category::Ptr();
+    }
+}
+
+uint32_t SqlitePersistence::getMaxCategoryId(){
+    try {
+        return valueQuery( "SELECT MAX(categoryid) FROM category;" );
+    } catch( SqliteException& ) {
+        return 0;
+    }
+}
+
+IdSet SqlitePersistence::getCategoryIds(){
+    try {
+        return idSetQuery( "SELECT categoryid FROM category;" );
+    } catch( SqliteException& ) {
+        return IdSet();
+    }
+}
+
+bool SqlitePersistence::saveDesign(Design::Ptr design){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "INSERT INTO design VALUES (" << design->getDesignId() << ", " << design->getCategoryId() << ", '";
+        querybuilder << addslashes(design->getName()) << "', '" << addslashes(design->getDescription()) << "', " << design->getOwner() << ", ";
+        querybuilder << design->getInUse() << ", " << design->getNumExist() << ", " << design->isValid() << ", '";
+        querybuilder << addslashes(design->getFeedback()) << "', " << design->getModTime() << ");";
+        singleQuery( querybuilder.str() );
+
+        insertMap( "designcomponent", design->getDesignId(), design->getComponents() );
+
+        PropertyValue::Map proplist = design->getPropertyValues();
+        if(!proplist.empty()){
+            querybuilder.str("");
+            querybuilder << "INSERT INTO designproperty VALUES ";
+            for( PropertyValue::Map::iterator itcurr = proplist.begin(); itcurr != proplist.end(); ++itcurr){
+                if(itcurr != proplist.begin())
+                    querybuilder << ", ";
+                PropertyValue pv = itcurr->second;
+                querybuilder << "(" << design->getDesignId() << ", " << itcurr->first << ", " << pv.getValue() << ", '";
+                querybuilder << addslashes(pv.getDisplayString()) << "')";
+            }
+            querybuilder << ";";
+            singleQuery( querybuilder.str() );
+        }
+        return true;
+    } catch( MysqlException& ) {
+        return false;
+    }
+}
+
+bool SqlitePersistence::updateDesign(Design::Ptr design){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "UPDATE design SET categoryid=" << design->getCategoryId() << ", name='";
+        querybuilder << addslashes(design->getName()) << "', description='" << addslashes(design->getDescription()) << "', owner=";
+        querybuilder << design->getOwner() << ", inuse=" << design->getInUse() << ", numexist=" << design->getNumExist() << ", valid=";
+        querybuilder << design->isValid() << ", feedback='" << addslashes(design->getFeedback());
+        querybuilder << "', modtime=" << design->getModTime() << " WHERE designid=" << design->getDesignId() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM designcomponent WHERE designid=" << design->getDesignId() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM designproperty WHERE designid=" << design->getDesignId() << ";";
+        singleQuery( querybuilder.str() );
+
+        insertMap( "designcomponent", design->getDesignId(), design->getComponents() );
+
+        PropertyValue::Map proplist = design->getPropertyValues();
+        if(!proplist.empty()){
+            querybuilder.str("");
+            querybuilder << "INSERT INTO designproperty VALUES ";
+            for(PropertyValue::Map::iterator itcurr = proplist.begin(); itcurr != proplist.end(); ++itcurr){
+                if(itcurr != proplist.begin())
+                    querybuilder << ", ";
+                PropertyValue pv = itcurr->second;
+                querybuilder << "(" << design->getDesignId() << ", " << itcurr->first << ", " << pv.getValue() << ", '";
+                querybuilder << addslashes(pv.getDisplayString()) << "')";
+            }
+            querybuilder << ";";
+            singleQuery( querybuilder.str() );
+        }
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+Design::Ptr SqlitePersistence::retrieveDesign(uint32_t designid){
+    Design::Ptr design;
+    try {
+        std::ostringstream querybuilder;
+        {
+            querybuilder << "SELECT * FROM design WHERE designid = " << designid << ";";
+            SqliteQuery query( db, querybuilder.str() );
+
+            design.reset( new Design() );
+            design->setDesignId(designid);
+            design->setCategoryId(query.getInt(1));
+            design->setName(query.get(2));
+            design->setDescription(query.get(3));
+            design->setOwner(query.getInt(4));
+            design->setInUse(query.getInt(5));
+            design->setNumExist(query.getInt(6));
+            design->setValid(query.getInt(7),query.get(8));
+            design->setModTime(query.getU64(9));
+        }
+
+        querybuilder.str("");
+        querybuilder << "SELECT componentid,count FROM designcomponent WHERE designid = " << designid << ";";
+            design->setComponents(idMapQuery(querybuilder.str()));
+
+        {
+            querybuilder.str("");
+            querybuilder << "SELECT propertyid,value,displaystring FROM designproperty WHERE designid = " << designid << ";";
+            SqliteQuery query( db, querybuilder.str() );
+            PropertyValue::Map pvlist;
+            while(query.nextRow()){
+                PropertyValue pv( atoi(query.get(0).c_str()), atof(query.get(1).c_str()));
+                pv.setDisplayString(query.get(2));
+                pvlist[pv.getPropertyId()] = pv;
+            }
+            design->setPropertyValues(pvlist);
+        }
+
+        return design;
+    } catch( SqliteException& ) {
+        return Design::Ptr();
+    }
+}
+
+uint32_t SqlitePersistence::getMaxDesignId(){
+    try {
+        return valueQuery( "SELECT MAX(designid) FROM design;" );
+    } catch( SqliteException& ) {
+        return 0;
+    }
+}
+
+IdSet SqlitePersistence::getDesignIds(){
+    try {
+        return idSetQuery( "SELECT designid FROM design;" );
+    } catch( SqliteException& ) {
+        return IdSet();
+    }
+}
+
+bool SqlitePersistence::saveComponent(Component::Ptr comp){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "INSERT INTO component VALUES (" << comp->getComponentId();
+        querybuilder<< ", '" << addslashes(comp->getName()) << "', '" << addslashes(comp->getDescription()) << "', '";
+        querybuilder << addslashes(comp->getTpclRequirementsFunction()) << "', " << comp->getModTime() << ");";
+        singleQuery( querybuilder.str() );
+
+        insertSet( "componentcat", comp->getId(), comp->getCategoryIds() );
+
+        std::map<uint32_t, std::string> proplist = comp->getPropertyList();
+        if(!proplist.empty()){
+            querybuilder.str("");
+            querybuilder << "INSERT INTO componentproperty VALUES ";
+            for(std::map<uint32_t, std::string>::iterator itcurr = proplist.begin(); itcurr != proplist.end(); ++itcurr){
+                if(itcurr != proplist.begin())
+                    querybuilder << ", ";
+                querybuilder << "(" << comp->getComponentId() << ", " << itcurr->first << ", '" << addslashes(itcurr->second) << "')";
+            }
+            querybuilder << ";";
+            singleQuery( querybuilder.str() );
+        }
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+Component::Ptr SqlitePersistence::retrieveComponent(uint32_t compid){
+    Component::Ptr comp;
+    try {
+        std::ostringstream querybuilder;
+        {
+            querybuilder << "SELECT * FROM component WHERE componentid = " << compid << ";";
+            SqliteQuery query( db, querybuilder.str() );
+
+            comp.reset( new Component() );
+            comp->setComponentId(compid);
+            comp->setName(query.get(1));
+            comp->setDescription(query.get(2));
+            comp->setTpclRequirementsFunction(query.get(3));
+            comp->setModTime(query.getU64(4));
+        }
+
+        querybuilder.str("");
+        querybuilder << "SELECT categoryid FROM componentcat WHERE componentid = " << compid << ";";
+        comp->setCategoryIds(idSetQuery( querybuilder.str() ) );
+
+        {
+            querybuilder.str("");
+            querybuilder << "SELECT propertyid,tpclvaluefunc FROM componentproperty WHERE componentid = " << compid << ";";
+            SqliteQuery query( db, querybuilder.str() );
+
+            std::map<uint32_t, std::string> pvlist;
+            while(query.nextRow()) {
+                pvlist[query.getInt(0)] = query.get(1);
+            }
+            comp->setPropertyList(pvlist);
+        }
+        return comp;
+    } catch( SqliteException& ) {
+        return Component::Ptr();
+    }
+}
+
+uint32_t SqlitePersistence::getMaxComponentId(){
+    try {
+        return valueQuery( "SELECT MAX(componentid) FROM component;" );
+    } catch( SqliteException& ) {
+        return 0;
+    }
+}
+
+
+IdSet SqlitePersistence::getComponentIds(){
+    try {
+        return idSetQuery( "SELECT componentid FROM component;" );
+    } catch( SqliteException& ) {
+        return IdSet();
+    }
+}
+
+bool SqlitePersistence::saveProperty(Property::Ptr prop){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "INSERT INTO property VALUES (" << prop->getPropertyId() << ", ";
+        querybuilder << prop->getRank() << ", '" << addslashes(prop->getName()) << "', '" << addslashes(prop->getDisplayName());
+        querybuilder << "', '" << addslashes(prop->getDescription()) << "', '" << addslashes(prop->getTpclDisplayFunction()) << "', '";
+        querybuilder << addslashes(prop->getTpclRequirementsFunction()) << "', " << prop->getModTime() << ");";
+        singleQuery( querybuilder.str() );
+        insertSet( "propertycat", prop->getPropertyId(), prop->getCategoryIds() );
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+Property::Ptr SqlitePersistence::retrieveProperty(uint32_t propid){
+    Property::Ptr prop;
+    try {
+        std::ostringstream querybuilder;
+        {
+            querybuilder << "SELECT * FROM property WHERE propertyid = " << propid << ";";
+            SqliteQuery query( db, querybuilder.str() );
+            prop.reset( new Property() );
+            prop->setPropertyId(propid);
+            prop->setRank(query.getInt(1));
+            prop->setName(query.get(2));
+            prop->setDisplayName(query.get(3));
+            prop->setDescription(query.get(4));
+            prop->setTpclDisplayFunction(query.get(5));
+            prop->setTpclRequirementsFunction(query.get(6));
+            prop->setModTime(query.getU64(7));
+        }
+
+        querybuilder.str("");
+        querybuilder << "SELECT categoryid FROM propertycat WHERE propertyid = " << propid << ";";
+        prop->setCategoryIds(idSetQuery( querybuilder.str() ) );
+        return prop;
+    } catch( SqliteException& ) {
+        return Property::Ptr();
+    }
+}
+
+uint32_t SqlitePersistence::getMaxPropertyId(){
+    try {
+        return valueQuery( "SELECT MAX(propertyid) FROM property;" );
+    } catch( SqliteException& ) {
+        return 0;
+    }
+}
+
+IdSet SqlitePersistence::getPropertyIds(){
+    try {
+        return idSetQuery( "SELECT propertyid FROM property;" );
+    } catch( SqliteException& ) {
+        return IdSet();
+    }
+}
+
+bool SqlitePersistence::saveObjectView(uint32_t playerid, ObjectView::Ptr ov){
+    try {
+        std::ostringstream querybuilder;
+        uint32_t turnnum =  Game::getGame()->getTurnNumber();
+        querybuilder << "DELETE FROM playerobjectview WHERE playerid=" << playerid << " AND objectid=" << ov->getObjectId() << " AND turnnum = " << turnnum << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "INSERT INTO playerobjectview VALUES (" << playerid << ", " << ov->getObjectId() << ", ";
+        querybuilder << turnnum << ", " << ((ov->isCompletelyVisible()) ? 1 : 0) << ", ";
+        querybuilder << ((ov->isGone()) ? 1 : 0) << ", " << ((ov->canSeeName()) ? 1 : 0) << ", '";
+        querybuilder << addslashes(ov->getVisibleName()) << "', " << ((ov->canSeeDescription()) ? 1 : 0) << ", '";
+        querybuilder << addslashes(ov->getVisibleDescription()) << "', " << ov->getModTime() << ");";
+        singleQuery( querybuilder.str() );
+
+        //params?
+
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+ObjectView::Ptr MysqlPersistence::retrieveObjectView(uint32_t playerid, uint32_t objectid, uint32_t turn){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "SELECT * FROM playerobjectview WHERE playerid = " << playerid << " AND objectid = " << objectid << " AND turnnum <= " << turn << " ORDER BY turnnum DESC LIMIT 1;";
+        SqliteQuery query( db, querybuilder.str() );
+        ObjectView::Ptr obj( new ObjectView() );
+        obj->setObjectId(objectid);
+        obj->setCompletelyVisible(query.getInt(3) == 1);
+        obj->setGone(query.getInt(4) == 1);
+        obj->setCanSeeName(query.getInt(5) == 1);
+        obj->setVisibleName(query.get(6));
+        obj->setCanSeeDescription(query.getInt(7) == 1);
+        obj->setVisibleDescription(query.get(8));
+        obj->setModTime(query.getU64(9));
+        return obj;
+    } catch( SqliteException& ) {
+        return ObjectView::Ptr();
+    }
+}
+
+bool SqlitePersistence::saveDesignView(uint32_t playerid, DesignView::Ptr dv){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "DELETE FROM playerdesignview WHERE playerid=" << playerid << " AND designid=" << dv->getDesignId() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM playerdesignviewcomp WHERE playerid=" << playerid << " AND designid=" << dv->getDesignId() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM playerdesignviewprop WHERE playerid=" << playerid << " AND designid=" << dv->getDesignId() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "INSERT INTO playerdesignview VALUES (" << playerid << ", " << dv->getDesignId() << ", ";
+        querybuilder << ((dv->isCompletelyVisible()) ? 1 : 0) << ", " << ((dv->canSeeName()) ? 1 : 0) << ", '";
+        querybuilder << addslashes(dv->getVisibleName()) << "', " << ((dv->canSeeDescription()) ? 1 : 0) << ", '";
+        querybuilder << addslashes(dv->getVisibleDescription()) << "', " << ((dv->canSeeNumExist()) ? 1 : 0) << ", ";
+        querybuilder << dv->getVisibleNumExist() << ", " << ((dv->canSeeOwner()) ? 1 : 0) << ", ";
+        querybuilder << dv->getVisibleOwner() << ", " << dv->getModTime() << ");";
+        singleQuery( querybuilder.str() );
+
+        insertMap( "playerdesignviewcomp", playerid, dv->getDesignId(), dv->getVisibleComponents() );
+
+        PropertyValue::Map proplist = dv->getVisiblePropertyValues();
+        if(!proplist.empty()){
+            querybuilder.str("");
+            querybuilder << "INSERT INTO playerdesignviewprop VALUES ";
+            for(std::map<uint32_t, PropertyValue>::iterator itcurr = proplist.begin(); itcurr != proplist.end();
+                    ++itcurr){
+                if(itcurr != proplist.begin())
+                    querybuilder << ", ";
+                querybuilder << "(" << playerid << ", " << dv->getDesignId() << ", " << (itcurr->second.getPropertyId());
+                querybuilder << ", '" << addslashes(itcurr->second.getDisplayString()) << "')";
+            }
+            querybuilder << ";";
+            singleQuery( querybuilder.str() );
+        }
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+DesignView::Ptr SqlitePersistence::retrieveDesignView(uint32_t playerid, uint32_t designid){
+    try {
+        DesignView::Ptr design( new DesignView() );
+        std::ostringstream querybuilder;
+
+            querybuilder << "SELECT * FROM playerdesignview WHERE playerid = " << playerid << " AND designid = " << designid << ";";
+            SqliteQuery query( db, querybuilder.str() );
+            design->setDesignId(designid);
+            design->setCompletelyVisible(query.getInt(2) == 1);
+            design->setCanSeeName(query.getInt(3) == 1);
+            design->setVisibleName(query.get(4));
+            design->setCanSeeDescription(query.getInt(5) == 1);
+            design->setVisibleDescription(query.get(6));
+            design->setCanSeeNumExist(query.getInt(7) == 1);
+            design->setVisibleNumExist(query.getInt(8));
+            design->setCanSeeOwner(query.getInt(9) == 1);
+            design->setVisibleOwner(query.getInt(10));
+            design->setModTime(query.getU64(11));
+
+
+        querybuilder.str("");
+        querybuilder << "SELECT componentid,quantity FROM playerdesignviewcomp WHERE playerid = " << playerid << " AND designid = " << designid << ";";
+        design->setVisibleComponents(idMapQuery( querybuilder.str() ) );
+
+        querybuilder.str("");
+        querybuilder << "SELECT propertyid,value FROM playerdesignviewprop WHERE playerid = " << playerid << " AND designid = " << designid << ";";
+        SqliteQuery propquery(db, querybuilder.str() );
+
+        PropertyValue::Map pvlist;
+        while(propquery.nextRow()){
+            PropertyValue pv( propquery.getInt(0), 0.0);
+            pv.setDisplayString(propquery.get(1));
+            pvlist[pv.getPropertyId()] = pv;
+        }
+        design->setVisiblePropertyValues(pvlist);
+        return design;
+    } catch( SqliteException& ) {
+        return DesignView::Ptr();
+    }
+}
+
+bool SqlitePersistence::saveComponentView(uint32_t playerid, ComponentView::Ptr cv){
+    try {
+        std::ostringstream querybuilder;
+        querybuilder << "DELETE FROM playercomponentview WHERE playerid=" << playerid << " AND componentid=" << cv->getComponentId() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM playercomponentviewcat WHERE playerid=" << playerid << " AND componentid=" << cv->getComponentId() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "DELETE FROM playercomponentviewproperty WHERE playerid=" << playerid << " AND componentid=" << cv->getComponentId() << ";";
+        singleQuery( querybuilder.str() );
+
+        querybuilder.str("");
+        querybuilder << "INSERT INTO playercomponentview VALUES (" << playerid << ", " << cv->getComponentId() << ", ";
+        querybuilder << ((cv->isCompletelyVisible()) ? 1 : 0) << ", " << ((cv->canSeeName()) ? 1 : 0) << ", '";
+        querybuilder << addslashes(cv->getVisibleName()) << "', " << ((cv->canSeeDescription()) ? 1 : 0) << ", '";
+        querybuilder << addslashes(cv->getVisibleDescription()) << "', " << ((cv->canSeeRequirementsFunc()) ? 1 : 0) << ", ";
+        querybuilder << cv->getModTime() << ");";
+        singleQuery( querybuilder.str() );
+
+        insertSet( "playercomponentviewcat", playerid, cv->getComponentId(), cv->getVisibleCategories() );
+        insertSet( "playercomponentviewproperty", playerid, cv->getComponentId(), cv->getVisiblePropertyFuncs() );
+
+        return true;
+    } catch( SqliteException& ) {
+        return false;
+    }
+}
+
+ComponentView::Ptr SqlitePersistence::retrieveComponentView(uint32_t playerid, uint32_t componentid){
+    try {
+        ComponentView::Ptr comp;
+        std::ostringstream querybuilder;
+        {
+            querybuilder << "SELECT * FROM playercomponentview WHERE playerid = " << playerid << " AND componentid = " << componentid << ";";
+            SqliteQuery query( db, querybuilder.str() );
+            comp.reset( new ComponentView( componentid, query.getInt(2) == 1) );
+            comp->setCanSeeName(query.getInt(3) == 1);
+            comp->setVisibleName(query.get(4));
+            comp->setCanSeeDescription(query.getInt(5) == 1);
+            comp->setVisibleDescription(query.get(6));
+            comp->setCanSeeRequirementsFunc(query.getInt(7) == 1);
+            comp->setModTime(query.getU64(8));
+        }
+
+        querybuilder.str("");
+        querybuilder << "SELECT categoryid FROM playercomponentviewcat WHERE playerid = " << playerid << " AND componentid = " << componentid << ";";
+        comp->setVisibleCategories(idSetQuery( querybuilder.str() ) );
+
+        querybuilder.str("");
+        querybuilder << "SELECT propertyid FROM playercomponentviewproperty WHERE playerid = " << playerid << " AND componentid = " << componentid << ";";
+        comp->setVisiblePropertyFuncs(idSetQuery( querybuilder.str() ));
+        return comp;
+    } catch( SqliteException& ) {
+        return ComponentView::Ptr();
     }
 }
 
@@ -948,7 +1923,7 @@ std::string SqlitePersistence::addslashes(const std::string& in) const{
 uint32_t SqlitePersistence::getTableVersion(const std::string& name){
     try {
         return valueQuery( "SELECT version FROM tableversion WHERE name='" + addslashes(name) + "';");
-    } catch( SqliteException& ) {
+    } catch( SqliteException& e) {
         throw std::exception();
     }
 }

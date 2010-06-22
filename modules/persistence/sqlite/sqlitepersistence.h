@@ -59,10 +59,79 @@ public:
     virtual Order* retrieveOrder(uint32_t queueid, uint32_t ordid);
     virtual bool removeOrder(uint32_t queueid, uint32_t ordid);
 
+    virtual bool saveBoard(boost::shared_ptr<Board> board);
+    virtual bool updateBoard(boost::shared_ptr<Board> board);
+    virtual boost::shared_ptr<Board> retrieveBoard(uint32_t boardid);
+    virtual uint32_t getMaxBoardId();
+    virtual IdSet getBoardIds();
+
+    virtual bool saveMessage( boost::shared_ptr< Message > msg);
+    virtual boost::shared_ptr< Message > retrieveMessage(uint32_t msgid);
+    virtual bool removeMessage(uint32_t msgid);
+    virtual bool saveMessageList(uint32_t bid, std::list<uint32_t> list);
+    virtual std::list<uint32_t> retrieveMessageList(uint32_t bid);
+    virtual uint32_t getMaxMessageId();
+
+    virtual bool saveResource(boost::shared_ptr<ResourceDescription> res);
+    virtual boost::shared_ptr<ResourceDescription> retrieveResource(uint32_t restype);
+    virtual uint32_t getMaxResourceId();
+    virtual IdSet getResourceIds();
+
+    virtual bool savePlayer(boost::shared_ptr<Player> player);
+    virtual bool updatePlayer(boost::shared_ptr<Player> player);
+    virtual boost::shared_ptr<Player> retrievePlayer(uint32_t playerid);
+    virtual uint32_t getMaxPlayerId();
+    virtual IdSet getPlayerIds();
+
+    virtual bool saveCategory(boost::shared_ptr<Category> cat);
+    virtual boost::shared_ptr<Category> retrieveCategory(uint32_t catid);
+    virtual uint32_t getMaxCategoryId();
+    virtual IdSet getCategoryIds();
+
+    virtual bool saveDesign(boost::shared_ptr<Design> design);
+    virtual bool updateDesign(boost::shared_ptr<Design> design);
+    virtual boost::shared_ptr<Design> retrieveDesign(uint32_t designid);
+    virtual uint32_t getMaxDesignId();
+    virtual IdSet getDesignIds();
+
+    virtual bool saveComponent(boost::shared_ptr<Component> comp);
+    virtual boost::shared_ptr<Component> retrieveComponent(uint32_t compid);
+    virtual uint32_t getMaxComponentId();
+    virtual IdSet getComponentIds();
+
+    virtual bool saveProperty(boost::shared_ptr<Property> prop);
+    virtual boost::shared_ptr<Property> retrieveProperty(uint32_t propid);
+    virtual uint32_t getMaxPropertyId();
+    virtual IdSet getPropertyIds();
+
+    virtual bool saveObjectView(uint32_t playerid, boost::shared_ptr<ObjectView> ov);
+    virtual boost::shared_ptr<ObjectView> retrieveObjectView(uint32_t playerid, uint32_t objectid, uint32_t turn = 0xffffffff);
+
+    virtual bool saveDesignView(uint32_t playerid, boost::shared_ptr<DesignView> dv);
+    virtual boost::shared_ptr<DesignView> retrieveDesignView(uint32_t playerid, uint32_t designid);
+
+    virtual bool saveComponentView(uint32_t playerid, boost::shared_ptr<ComponentView> cv);
+    virtual boost::shared_ptr<ComponentView> retrieveComponentView(uint32_t playerid, uint32_t componentid);
 
     std::string addslashes(const std::string& in) const;
     uint32_t getTableVersion(const std::string& name);
 private:
+
+    bool updateSpaceCoordParam(uint32_t queueid, uint32_t ordid, uint32_t pos, SpaceCoordParam* scp);
+    bool retrieveSpaceCoordParam(uint32_t queueid, uint32_t ordid, uint32_t pos, SpaceCoordParam* scp);
+    bool removeSpaceCoordParam(uint32_t queueid, uint32_t ordid, uint32_t pos);
+    bool updateListParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, ListParameter* lp);
+    bool retrieveListParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, ListParameter* lp);
+    bool removeListParameter(uint32_t queueid, uint32_t ordid, uint32_t pos);
+    bool updateObjectOrderParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, ObjectOrderParameter* ob);
+    bool retrieveObjectOrderParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, ObjectOrderParameter* ob);
+    bool removeObjectOrderParameter(uint32_t queueid, uint32_t ordid, uint32_t pos);
+    bool updateStringParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, StringParameter* st);
+    bool retrieveStringParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, StringParameter* st);
+    bool removeStringParameter(uint32_t queueid, uint32_t ordid, uint32_t pos);
+    bool updateTimeParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, TimeParameter* tp);
+    bool retrieveTimeParameter(uint32_t queueid, uint32_t ordid, uint32_t pos, TimeParameter* tp);
+    bool removeTimeParameter(uint32_t queueid, uint32_t ordid, uint32_t pos);
         void lock();
         void unlock();
         sqlite3* db;
