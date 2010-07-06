@@ -2349,7 +2349,7 @@ bool SqliteQuery::validRow() {
 
 bool SqliteQuery::nextRow() {
     if ( result == -1 ) fetchResult();
-    else fetchResult();
+    if ( row == true ) fetchResult();
     row = (result == SQLITE_ROW);
     return row;
 }
