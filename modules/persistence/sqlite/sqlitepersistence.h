@@ -13,7 +13,8 @@
 
 #include <tpserver/persistence.h>
 
-typedef struct sqlite3 sqlite3;
+typedef struct sqlite3 SQLITE;
+typedef struct sqlite3_stmt STATEMENT;
 class SpaceCoordParam;
 class ObjectOrderParameter;
 class ListParameter;
@@ -33,7 +34,6 @@ class MediaObjectParam;
 class SqlitePersistence : public Persistence{
 public:
     SqlitePersistence();
-    SqlitePersistence(const sqlitepersistence& orig);
     virtual ~SqlitePersistence();
 
     virtual bool init();
@@ -155,7 +155,7 @@ private:
 
         void lock();
         void unlock();
-        sqlite3* db;
+        SQLITE* db;
         char* db_err;
 
     void idSetToStream( std::ostringstream& stream, const uint32_t id, const IdSet& idset ) const;
@@ -181,7 +181,7 @@ private:
 
 class SqliteQuery {
   public:
-    SqliteQuery( sqlite3* db, const std::string& new_query );
+    SqliteQuery( SQLITE* db, const std::string& new_query );
     ~SqliteQuery();
 
     static void lock() {}
@@ -196,15 +196,15 @@ class SqliteQuery {
   private:
 
     void fetchResult();
-    sqlite3* database;
+    SQLITE* database;
     char* db_err;
-    sqlite3_stmt stmt;
+    STATEMENT* stmt;
     int result;
     bool row;
 
     std::string query;
 
-    MysqlQuery() {};
+    SqliteQuery() {};
 };
 
 #endif	/* _SQLITEPERSISTENCE_H */

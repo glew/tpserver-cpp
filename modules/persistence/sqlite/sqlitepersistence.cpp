@@ -2274,7 +2274,7 @@ const IdMap SqlitePersistence::idMapQuery( const std::string& query ) {
 
 
 SqliteQuery::SqliteQuery( sqlite3* db, const std::string& new_query )
-: database( db ), result( NULL ), row( NULL ), query( new_query ), db_err( NULL )
+: database( db ), result( -1 ), row( false ), query( new_query ), db_err( NULL )
 {
     lock();
     //sqlite3_stmt stmt;
@@ -2286,43 +2286,47 @@ SqliteQuery::SqliteQuery( sqlite3* db, const std::string& new_query )
 }
 
 const std::string SqliteQuery::get( uint32_t index ) {
-        if ( result == NULL )
+        if ( result == -1 )
         {
             fetchResult();
             nextRow();
         }
-        if ( row == NULL ) {
+        if ( row == false ) {
             throw SqliteException( database, "Query '"+query+"' row empty!");
         }
-        return (sqlite3_column_text(stmt, index));
+        const char* item = (const char*)(sqlite3_column_text(stmt, index));
+
+        return item;
   }
 
 int SqliteQuery::getInt( uint32_t index ) {
-    if ( result == NULL ) {
+    if ( result == -1 ) {
         fetchResult();
         nextRow();
     }
-    if ( row == NULL ) {
+    if ( row == false ) {
         throw SqliteException( database, "Query '"+query+"' row empty!");
     }
-    if ( row[index] == NULL ){
+    if ( sqlite3_column_text(stmt, index) == NULL ){
         throw SqliteException( database, "Int value is NULL");
     }
     return sqlite3_column_int(stmt, index);
 }
 
 uint64_t SqliteQuery::getU64( uint32_t index ) {
-    if ( result == NULL ) {
+    if ( result == -1 ) {
         fetchResult();
         nextRow();
     }
-    if ( row == NULL ) {
+    if ( row == false ) {
         throw SqliteException( database, "Query '"+query+"' row empty!");
     }
-    if ( row[index] == NULL ){
+    if ( (sqlite3_column_text(stmt, index)) == NULL ){
         throw SqliteException( database, "UInt64 value is NULL");
     }
-    return strtoull((sqlite3_column_text(stmt, index)),NULL,10);
+    const char* item = (const char*)(sqlite3_column_text(stmt, index));
+
+    return strtoull(item,NULL,10);
 }
 
 void SqliteQuery::fetchResult() {
@@ -2336,20 +2340,21 @@ void SqliteQuery::fetchResult() {
 }
 
 bool SqliteQuery::validRow() {
-    if ( result == NULL ) {
+    if ( result == -1 ) {
         fetchResult();
         nextRow();
     }
-    return row != NULL;
+    return (row);
 }
 
 bool SqliteQuery::nextRow() {
-    if ( result == NULL ) fetchResult();
+    if ( result == -1 ) fetchResult();
+    else fetchResult();
     row = (result == SQLITE_ROW);
     return row;
 }
 
 SqliteQuery::~SqliteQuery() {
-    if ( result != NULL ) sqlite3_finalize(stmt);
+    if ( result != -1 ) sqlite3_finalize(stmt);
     unlock(); // unlock needs to be multiunlock safe
 }

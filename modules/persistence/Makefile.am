@@ -1,2 +1,2 @@
-SUBDIRS = mysql
+SUBDIRS = mysql sqlite
 
