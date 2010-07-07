@@ -5,9 +5,6 @@
  * Created on June 17, 2010, 10:54 AM
  */
 
-//included in persistence.h
-#include <stdint.h>
-
 #include <sstream>
 
 #include <tpserver/logging.h>
@@ -51,14 +48,12 @@
 
 #include "sqlitepersistence.h"
 
-// TODO:
-//extern "C" ...
-//extern "C" {
-//#define tp_init libtpmysql_LTX_tp_init
-//  bool tp_init(){
-//    return Game::getGame()->setPersistence(new MysqlPersistence());
-//  }
-//}
+extern "C" {
+#define tp_init libtpsqlite_LTX_tp_init
+  bool tp_init(){
+    return Game::getGame()->setPersistence(new SqlitePersistence());
+  }
+}
 
 class SqliteException : public std::exception {
     public:
