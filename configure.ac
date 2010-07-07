@@ -325,6 +325,50 @@ fi
 AC_SUBST([MYSQL_CFLAGS])
 AC_SUBST([MYSQL_LIBS])
 
+# ===================================================
+# SQLITE tests
+# ===================================================
+
+AC_ARG_WITH(sqlite,
+  AS_HELP_STRING([--with-sqlite],
+    [Set to use sqlite]
+  ),
+  ,
+)
+AC_ARG_VAR([SQLITE_CONFIG], [sqlite_config program])
+if test "$with_sqlite" = "no"; then
+    AM_CONDITIONAL(SQLITE, false)
+else
+
+    if test -z "$SQLITE_CONFIG"; then
+        AC_PATH_PROG(SQLITE_CONFIG,pkg-config,,)
+    fi
+
+    # THIS SMALL CHANGE TO THE STANDARD .M4 FILE SIMPLY SETS A VARIABLE IF
+    # MYSQL IS NOT THERE.
+    if test -z "$SQLITE_CONFIG"; then
+        no_sqlite=yes
+    else
+        AC_MSG_CHECKING(sqlite libraries)
+        SQLITE_LIBS=`${SQLITE_CONFIG} --libs sqlite3`
+        AC_MSG_RESULT($SQLITE_LIBS)
+        AC_MSG_CHECKING(sqlite includes)
+        SQLITE_CFLAGS=`${SQLITE_CONFIG} --cflags sqlite3`
+        AC_MSG_RESULT($SQLITE_CFLAGS)
+        no_sqlite=no
+    fi
+    
+    if test "$no_sqlite" = "yes"; then
+        AM_CONDITIONAL(SQLITE, false)
+    else
+        AC_DEFINE(HAVE_LIBSQLITE, 1, [Define to 1 if you have the `sqlite' library (-lsqlite3).])
+        AM_CONDITIONAL(SQLITE, true)
+    fi
+fi
+
+AC_SUBST(SQLITE_CFLAGS)
+AC_SUBST(SQLITE_LIBS)
+
 
 dnl @synopsis AC_DEFINE_DIR(VARNAME, DIR [, DESCRIPTION])
 dnl
