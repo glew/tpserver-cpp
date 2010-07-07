@@ -59,7 +59,7 @@ class SqliteException : public std::exception {
     public:
         // CHECK: passing the error message
         SqliteException( char **errmsg, const std::string& error ) {
-            errorstr = error + " " + std::string(errmsg);
+            errorstr = error + " " + errmsg;
             Logger::getLogger()->error( ("Sqlite : "+errorstr).c_str() );
         }
 
@@ -80,7 +80,7 @@ SqlitePersistence::SqlitePersistence() : db(NULL), db_err(NULL) {
 }
 
 SqlitePersistence::~SqlitePersistence() {
-    if(db! = NULL)
+    if(db != NULL)
         shutdown();
 }
 
@@ -364,7 +364,6 @@ bool SqlitePersistence::init() {
         }
     }else{
         // check for tables to be updates.
-        sqlite3_stmt stmt;
         sqlite3_prepare_v2(db, "SELECT * FROM tableversion;", -1, &stmt, NULL);
         if (sqlite3_step(stmt) == SQLITE_DONE){
             Logger::getLogger()->error("Sqlite: table versions query result error");
@@ -428,7 +427,7 @@ bool SqlitePersistence::saveGameInfo(){
         querybuilder << "INSERT INTO gameinfo VALUES ('" << addslashes(game->getKey()) << "', ";
         querybuilder << game->getGameStartTime() << ", " << game->getTurnNumber();
         querybuilder << ", '" << game->getTurnName() << "');";
-        sqlite3_exec(db, querybuilder.str() );
+        sqlite3_exec(db, querybuilder.str(), NULL, 0, &db_err );
     } catch (SqliteException& e ) {
         return false;
     }
@@ -460,7 +459,7 @@ bool SqlitePersistence::saveObject(IGObject::Ptr ob){
         querybuilder.str("");
         querybuilder << "INSERT INTO object VALUES (" << obid << ", " << turn << ", ";
         querybuilder << (ob->isAlive() ? 1 : 0) << ", " << ob->getType() << ", ";
-        querybuilder << << "'" << addslashes(ob->getName()) << "', '" << addslashes(ob->getDescription()) << "', ";
+        querybuilder << "'" << addslashes(ob->getName()) << "', '" << addslashes(ob->getDescription()) << "', ";
         querybuilder << ob->getParent() << ", " << ob->getModTime() << ");";
         singleQuery( querybuilder.str() );
 
@@ -660,8 +659,8 @@ bool SqlitePersistence::saveOrderQueue(const boost::shared_ptr<OrderQueue> oq){
 bool SqlitePersistence::updateOrderQueue(const boost::shared_ptr<OrderQueue> oq){
     try{
         std::ostringstream querybuilder;
-        querybuilder << "UPDATE orderqueue set objectid=" << oq->getObjectId() << ", active=" <<(oq->isActive ? 1 : 0);
-        querybuilder << ", repeating=" (oq->isRepeating() ? 1 : 0) << ", modtime=" << oq->getModTime() << " WHERE queueid =" << oq->getQueueId() << ";";
+        querybuilder << "UPDATE orderqueue set objectid=" << oq->getObjectId() << ", active=" <<(oq->isActive() ? 1 : 0);
+        querybuilder << ", repeating=" << (oq->isRepeating() ? 1 : 0) << ", modtime=" << oq->getModTime() << " WHERE queueid =" << oq->getQueueId() << ";";
         singleQuery( querybuilder.str() );
 
         querybuilder.str("");
@@ -2277,9 +2276,9 @@ SqliteQuery::SqliteQuery( sqlite3* db, const std::string& new_query )
 {
     lock();
     //sqlite3_stmt stmt;
-    if ( sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, NULL) != 0 ) {
+    if ( sqlite3_prepare_v2(database, query.c_str(), -1, &stmt, NULL) != 0 ) {
         unlock(); // Destructor WON'T get called if throw is in constructor
-        throw SqliteException(database,  "Query '"+query+"' failed!");
+        throw SqliteException(db_err,  "Query '"+query+"' failed!");
     }
 
 }
@@ -2291,7 +2290,7 @@ const std::string SqliteQuery::get( uint32_t index ) {
             nextRow();
         }
         if ( row == false ) {
-            throw SqliteException( database, "Query '"+query+"' row empty!");
+            throw SqliteException( db_err, "Query '"+query+"' row empty!");
         }
         const char* item = (const char*)(sqlite3_column_text(stmt, index));
 
@@ -2304,10 +2303,10 @@ int SqliteQuery::getInt( uint32_t index ) {
         nextRow();
     }
     if ( row == false ) {
-        throw SqliteException( database, "Query '"+query+"' row empty!");
+        throw SqliteException( db_err, "Query '"+query+"' row empty!");
     }
     if ( sqlite3_column_text(stmt, index) == NULL ){
-        throw SqliteException( database, "Int value is NULL");
+        throw SqliteException( db_err, "Int value is NULL");
     }
     return sqlite3_column_int(stmt, index);
 }
@@ -2318,10 +2317,10 @@ uint64_t SqliteQuery::getU64( uint32_t index ) {
         nextRow();
     }
     if ( row == false ) {
-        throw SqliteException( database, "Query '"+query+"' row empty!");
+        throw SqliteException( db_err, "Query '"+query+"' row empty!");
     }
     if ( (sqlite3_column_text(stmt, index)) == NULL ){
-        throw SqliteException( database, "UInt64 value is NULL");
+        throw SqliteException( db_err, "UInt64 value is NULL");
     }
     const char* item = (const char*)(sqlite3_column_text(stmt, index));
 
@@ -2333,7 +2332,7 @@ void SqliteQuery::fetchResult() {
     //if (result == NULL) //empty result or error
     result = sqlite3_step(stmt);
     if ( result != SQLITE_ROW ) {
-        throw SqliteException( database, "Query '"+query+"' result failed!");
+        throw SqliteException( db_err, "Query '"+query+"' result failed!");
     }
     unlock();
 }
