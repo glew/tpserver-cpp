@@ -47,8 +47,6 @@
 #include <tpserver/sizeobjectparam.h>
 #include <tpserver/mediaobjectparam.h>
 
-#include <my_global.h>
-#include <my_sys.h>
 #include <sqlite3.h>
 
 #include "sqlitepersistence.h"
@@ -470,7 +468,7 @@ bool SqlitePersistence::saveObject(IGObject::Ptr ob){
         if(ob->isAlive()){
             try{
                 ObjectParameterGroup::Map groups = ob->getParameterGroups();
-                for(ObjectParameterGroup::Mapp::iterator itcurr = groups.begin();
+                for(ObjectParameterGroup::Map::iterator itcurr = groups.begin();
                         itcurr != groups.end(); ++itcurr){
                     ObjectParameterGroup::ParameterList params = itcurr->second->getParameters();
                     uint32_t ppos = 0;
@@ -535,7 +533,7 @@ IGObject::Ptr SqlitePersistence::retrieveObject(uint32_t obid){
         querybuilder << "SELECT * FROM object WHERE objectid = " << obid << " AND turnnum <= " << turn;
         querybuilder << " ORDER BY turnnum DESC LIMIT 1;";
         SqliteQuery query( db, querybuilder.str() );
-        query.nextRob();
+        query.nextRow();
 
         IGObject::Ptr object( new IGObject(obid) );
 
@@ -569,7 +567,7 @@ IGObject::Ptr SqlitePersistence::retrieveObject(uint32_t obid){
                     uint32_t ppos = 0;
                     for(ObjectParameterGroup::ParameterList::iterator paramcurr = params.begin();
                             paramcurr != params.end(); ++paramcurr){
-                        ObjectParameter* parameter *(paramcurr);
+                        ObjectParameter* parameter = *(paramcurr);
                         switch(parameter->getType()){
                             case obpT_Position_3D:
                                 retrievePosition3dObjectParam(obid, turn, 0, itcurr->first, ppos, static_cast<Position3dObjectParam*>(parameter));
@@ -646,11 +644,11 @@ bool SqlitePersistence::saveOrderQueue(const boost::shared_ptr<OrderQueue> oq){
     try{
         std::ostringstream querybuilder;
         querybuilder << "INSERT INTO orderqueue VALUEs (" << oq->getQueueId() << ", " << oq->getObjectId() << ", ";
-        querybuidler << (oq->isActive() ? 1 : 0) << ", " << (oq->isRepeating() ? 1 : 0) << ", " << oq->getModTime() << ");";
+        querybuilder << (oq->isActive() ? 1 : 0) << ", " << (oq->isRepeating() ? 1 : 0) << ", " << oq->getModTime() << ");";
         singleQuery(querybuilder.str() );
 
-        insertList( "orderslot", oq->getQueueID(), oq->getOrderSlots() );
-        insertSet ( "orderqueueowner", oq->getQueueID(), oq->getOwner() );
+        insertList( "orderslot", oq->getQueueId(), oq->getOrderSlots() );
+        insertSet ( "orderqueueowner", oq->getQueueId(), oq->getOwner() );
         insertSet ( "orderqueueallowedtype", oq->getQueueId(), oq->getAllowedOrderTypes() );
         return true;
     } catch (SqliteException& e) {
@@ -662,7 +660,7 @@ bool SqlitePersistence::updateOrderQueue(const boost::shared_ptr<OrderQueue> oq)
     try{
         std::ostringstream querybuilder;
         querybuilder << "UPDATE orderqueue set objectid=" << oq->getObjectId() << ", active=" <<(oq->isActive ? 1 : 0);
-        querybuidler << ", repeating=" (oq->isRepeating() ? 1 : 0) << ", modtime=" << oq->getModTime() << " WHERE queueid =" << oq->getQueueID() << ";";
+        querybuilder << ", repeating=" (oq->isRepeating() ? 1 : 0) << ", modtime=" << oq->getModTime() << " WHERE queueid =" << oq->getQueueId() << ";";
         singleQuery( querybuilder.str() );
 
         querybuilder.str("");
@@ -2264,7 +2262,7 @@ const IdList SqlitePersistence::idListQuery( const std::string& query ) {
 }
 
 const IdMap SqlitePersistence::idMapQuery( const std::string& query ) {
-    SqliteQuery q( conn, query );
+    SqliteQuery q( db, query );
     IdMap map;
     while(q.nextRow()){
         map[ q.getInt(0) ] = q.getInt(1);
