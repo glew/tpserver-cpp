@@ -416,6 +416,7 @@ modules/games/mtsec/Makefile
 modules/games/rfts/Makefile
 modules/persistence/Makefile
 modules/persistence/mysql/Makefile
+modules/persistence/sqlite/Makefile
 modules/tpcl/Makefile
 modules/tpcl/guile/Makefile
 modules/tpcl/mzscheme/Makefile
