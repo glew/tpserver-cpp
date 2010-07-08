@@ -58,8 +58,8 @@ extern "C" {
 class SqliteException : public std::exception {
     public:
         // CHECK: passing the error message
-        SqliteException( char **errmsg, const std::string& error ) {
-            errorstr = error + " " + errmsg;
+        SqliteException( char* errmsg, const std::string& error ) {
+            errorstr = error + " " + std::string(errmsg);
             Logger::getLogger()->error( ("Sqlite : "+errorstr).c_str() );
         }
 
@@ -427,7 +427,8 @@ bool SqlitePersistence::saveGameInfo(){
         querybuilder << "INSERT INTO gameinfo VALUES ('" << addslashes(game->getKey()) << "', ";
         querybuilder << game->getGameStartTime() << ", " << game->getTurnNumber();
         querybuilder << ", '" << game->getTurnName() << "');";
-        sqlite3_exec(db, querybuilder.str(), NULL, 0, &db_err );
+        const char* querystr = (const char*)((querybuilder.str()).c_str());
+        sqlite3_exec(db, querystr, NULL, 0, &db_err );
     } catch (SqliteException& e ) {
         return false;
     }
