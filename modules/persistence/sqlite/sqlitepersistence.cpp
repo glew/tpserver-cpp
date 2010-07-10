@@ -109,7 +109,7 @@ bool SqlitePersistence::init() {
     std::string spass = conf->get("sqlite_pass");
     if(spass.length() != 0)
         pass = spass.c_str();
-    const char* database = NULL;
+    const char* database = "/var/tmp/tpserver.db";
     std::string sdb = conf->get("sqlite_db");
     if(sdb.length() != 0)
         database = sdb.c_str();
@@ -134,8 +134,10 @@ bool SqlitePersistence::init() {
 //        return false;
 //    }
 
+    //Testing fixed absolute db path
+    const char* databasefile = "/var/tmp/tpserver.db";
 
-    if (sqlite3_open(database, &db)){
+    if (sqlite3_open(databasefile, &db)){
         Logger::getLogger()->error("Can't open database: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
         unlock();
@@ -149,8 +151,8 @@ bool SqlitePersistence::init() {
         // create tables
         Logger::getLogger()->info("Creating database tables");
         try{
-            sqlite3_exec(db, "CREATE TABLE tableversion ( tableid INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, "
-                "name VARCHAR(50) NOT NULL UNIQUE, version INT UNSIGNED NOT NULL);", NULL, 0, &db_err);
+            sqlite3_exec(db, "CREATE TABLE tableversion ( tableid INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "name VARCHAR(50) NOT NULL UNIQUE, version INT UNSIGNED NOT NULL);", NULL, 0, &db_err);
             if(db_err != NULL)
                 throw std::exception();
             sqlite3_exec(db, "INSERT INTO tableversion VALUES (NULL, 'tableversion', 1), (NULL, 'gameinfo', 1), "
