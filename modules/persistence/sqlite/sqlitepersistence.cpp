@@ -155,24 +155,24 @@ bool SqlitePersistence::init() {
                     "name VARCHAR(50) NOT NULL UNIQUE, version INT UNSIGNED NOT NULL);", NULL, 0, &db_err);
             if(db_err != NULL)
                 throw std::exception();
-            sqlite3_exec(db, "INSERT INTO tableversion VALUES (NULL, 'tableversion', 1), (NULL, 'gameinfo', 1), "
-            "(NULL, 'object', 0), (NULL, 'objectparamposition', 0), (NULL, 'objectparamvelocity', 0), "
-            "(NULL, 'objectparamorderqueue', 0), (NULL, 'objectparamresourcelist', 0), "
-            "(NULL, 'objectparamreference', 0), (NULL, 'objectparamrefquantitylist', 0), "
-            "(NULL, 'objectparaminteger', 0), (NULL, 'objectparamsize', 0), (NULL, 'objectparammedia', 0), "
-            "(NULL, 'orderqueue', 0), (NULL, 'orderqueueowner', 0), (NULL, 'orderqueueallowedtype', 0), "
-            "(NULL, 'ordertype', 0), (NULL, 'orderresource', 0), (NULL, 'orderslot', 0), "
-            "(NULL, 'orderparamspace', 0), (NULL, 'orderparamobject', 0), "
-            "(NULL, 'orderparamstring', 0), (NULL, 'orderparamtime', 0), "
-            "(NULL, 'orderparamlist', 0), "
-            "(NULL, 'board', 0), (NULL, 'message', 0), (NULL, 'messagereference', 0), (NULL, 'messageslot', 0), "
-            "(NULL, 'player', 0), (NULL, 'playerscore', 0), (NULL, 'playerdesignview', 0), (NULL, 'playerdesignviewcomp', 0), "
-            "(NULL, 'playerdesignviewprop', 0), (NULL, 'playerdesignusable', 0), (NULL, 'playercomponentview', 0), "
-            "(NULL, 'playercomponentviewcat', 0), (NULL, 'playercomponentviewproperty', 0), "
-            "(NULL, 'playercomponentusable', 0), (NULL, 'playerobjectview', 0), (NULL, 'playerobjectowned', 0), "
-            "(NULL, 'category', 0), (NULL, 'design',0), (NULL, 'designcomponent', 0), (NULL, 'designproperty', 0), "
-            "(NULL, 'component', 0), (NULL, 'componentcat', 0), (NULL, 'componentproperty', 0), "
-            "(NULL, 'property', 0), (NULL, 'propertycat', 0), (NULL, 'resourcedesc', 0);", NULL, 0, &db_err);
+            sqlite3_exec(db, "INSERT INTO tableversion VALUES (NULL, 'tableversion', 1); INSERT INTO tableversion VALUES (NULL, 'gameinfo', 1); "
+            "INSERT INTO tableversion VALUES (NULL, 'object', 0); INSERT INTO tableversion VALUES (NULL, 'objectparamposition', 0); INSERT INTO tableversion VALUES (NULL, 'objectparamvelocity', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'objectparamorderqueue', 0); INSERT INTO tableversion VALUES (NULL, 'objectparamresourcelist', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'objectparamreference', 0); INSERT INTO tableversion VALUES (NULL, 'objectparamrefquantitylist', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'objectparaminteger', 0); INSERT INTO tableversion VALUES (NULL, 'objectparamsize', 0); INSERT INTO tableversion VALUES (NULL, 'objectparammedia', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'orderqueue', 0); INSERT INTO tableversion VALUES (NULL, 'orderqueueowner', 0); INSERT INTO tableversion VALUES (NULL, 'orderqueueallowedtype', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'ordertype', 0); INSERT INTO tableversion VALUES (NULL, 'orderresource', 0); INSERT INTO tableversion VALUES (NULL, 'orderslot', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'orderparamspace', 0); INSERT INTO tableversion VALUES (NULL, 'orderparamobject', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'orderparamstring', 0); INSERT INTO tableversion VALUES (NULL, 'orderparamtime', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'orderparamlist', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'board', 0); INSERT INTO tableversion VALUES (NULL, 'message', 0); INSERT INTO tableversion VALUES (NULL, 'messagereference', 0); INSERT INTO tableversion VALUES (NULL, 'messageslot', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'player', 0); INSERT INTO tableversion VALUES (NULL, 'playerscore', 0); INSERT INTO tableversion VALUES (NULL, 'playerdesignview', 0); INSERT INTO tableversion VALUES (NULL, 'playerdesignviewcomp', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'playerdesignviewprop', 0); INSERT INTO tableversion VALUES (NULL, 'playerdesignusable', 0); INSERT INTO tableversion VALUES (NULL, 'playercomponentview', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'playercomponentviewcat', 0); INSERT INTO tableversion VALUES (NULL, 'playercomponentviewproperty', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'playercomponentusable', 0); INSERT INTO tableversion VALUES (NULL, 'playerobjectview', 0); INSERT INTO tableversion VALUES (NULL, 'playerobjectowned', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'category', 0); INSERT INTO tableversion VALUES (NULL, 'design',0); INSERT INTO tableversion VALUES (NULL, 'designcomponent', 0); INSERT INTO tableversion VALUES (NULL, 'designproperty', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'component', 0); INSERT INTO tableversion VALUES (NULL, 'componentcat', 0); INSERT INTO tableversion VALUES (NULL, 'componentproperty', 0); "
+            "INSERT INTO tableversion VALUES (NULL, 'property', 0); INSERT INTO tableversion VALUES (NULL, 'propertycat', 0); INSERT INTO tableversion VALUES (NULL, 'resourcedesc', 0);", NULL, 0, &db_err);
             if(db_err != NULL)
                 throw std::exception();
             sqlite3_exec(db,"CREATE TABLE gameinfo (metakey VARCHAR(50) NOT NULL, ctime BIGINT UNSIGNED NOT NULL PRIMARY KEY, turnnum INT UNSIGNED NOT NULL, turnname VARCHAR(50) NOT NULL);", NULL, 0, &db_err);
