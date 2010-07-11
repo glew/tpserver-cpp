@@ -58,8 +58,10 @@ extern "C" {
 class SqliteException : public std::exception {
     public:
         // CHECK: passing the error message
-        SqliteException( char* errmsg, const std::string& error ) {
-            errorstr = error + " " + std::string(errmsg);
+        SqliteException( const char* errmsg, const std::string& error ) {
+            Logger::getLogger()->debug("SqliteException::constructor 1");
+            errorstr = error + " : " + std::string(errmsg);
+            Logger::getLogger()->debug("SqliteException::constructor 2");
             Logger::getLogger()->error( ("Sqlite : "+errorstr).c_str() );
         }
 
@@ -2294,62 +2296,97 @@ SqliteQuery::SqliteQuery( sqlite3* db, const std::string& new_query )
     //sqlite3_stmt stmt;
     if ( sqlite3_prepare_v2(database, query.c_str(), -1, &stmt, NULL) != 0 ) {
         unlock(); // Destructor WON'T get called if throw is in constructor
+        db_err = sqlite3_errmsg(database);
         throw SqliteException(db_err,  "Query '"+query+"' failed!");
     }
 
 }
 
 const std::string SqliteQuery::get( uint32_t index ) {
+        Logger::getLogger()->debug("SqliteQuery::get 1");
         if ( result == -1 )
         {
+            Logger::getLogger()->debug("SqliteQuery::get 2");
             fetchResult();
+            Logger::getLogger()->debug("SqliteQuery::get 3");
             nextRow();
         }
+        Logger::getLogger()->debug("SqliteQuery::get 4");
         if ( row == false ) {
+            Logger::getLogger()->debug("SqliteQuery::get 5");
+            db_err = sqlite3_errmsg(database);
             throw SqliteException( db_err, "Query '"+query+"' row empty!");
         }
+        Logger::getLogger()->debug("SqliteQuery::get 6");
         const char* item = (const char*)(sqlite3_column_text(stmt, index));
 
+        Logger::getLogger()->debug("SqliteQuery::get 7");
         return item;
   }
 
 int SqliteQuery::getInt( uint32_t index ) {
+    Logger::getLogger()->debug("SqliteQuery::getInt 1");
     if ( result == -1 ) {
+        Logger::getLogger()->debug("SqliteQuery::getInt 2");
         fetchResult();
+        Logger::getLogger()->debug("SqliteQuery::getInt 3");
         nextRow();
     }
+    Logger::getLogger()->debug("SqliteQuery::getInt 4");
     if ( row == false ) {
+        Logger::getLogger()->debug("SqliteQuery::getInt 5");
+        db_err = sqlite3_errmsg(database);
         throw SqliteException( db_err, "Query '"+query+"' row empty!");
     }
+    Logger::getLogger()->debug("SqliteQuery::getInt 6");
     if ( sqlite3_column_text(stmt, index) == NULL ){
+        Logger::getLogger()->debug("SqliteQuery::getInt 7");
+        db_err = sqlite3_errmsg(database);
         throw SqliteException( db_err, "Int value is NULL");
     }
+    Logger::getLogger()->debug("SqliteQuery::getInt 8");
     return sqlite3_column_int(stmt, index);
 }
 
 uint64_t SqliteQuery::getU64( uint32_t index ) {
+    Logger::getLogger()->debug("SqliteQuery::getU64 1");
     if ( result == -1 ) {
+        Logger::getLogger()->debug("SqliteQuery::getU64 2");
         fetchResult();
+        Logger::getLogger()->debug("SqliteQuery::getU64 3");
         nextRow();
     }
+    Logger::getLogger()->debug("SqliteQuery::getU64 4");
     if ( row == false ) {
+        Logger::getLogger()->debug("SqliteQuery::getU64 5");
+        db_err = sqlite3_errmsg(database);
         throw SqliteException( db_err, "Query '"+query+"' row empty!");
     }
+    Logger::getLogger()->debug("SqliteQuery::getU64 6");
     if ( (sqlite3_column_text(stmt, index)) == NULL ){
+        Logger::getLogger()->debug("SqliteQuery::getU64 7");
+        db_err = sqlite3_errmsg(database);
         throw SqliteException( db_err, "UInt64 value is NULL");
     }
+    Logger::getLogger()->debug("SqliteQuery::getU64 8");
     const char* item = (const char*)(sqlite3_column_text(stmt, index));
 
+    Logger::getLogger()->debug("SqliteQuery::getU64 9");
     return strtoull(item,NULL,10);
 }
 
 void SqliteQuery::fetchResult() {
     //result = mysql_store_result(connection);
     //if (result == NULL) //empty result or error
+    Logger::getLogger()->debug("SqliteQuery::fetchRow 1");
     result = sqlite3_step(stmt);
-    if ( result != SQLITE_ROW ) {
+    Logger::getLogger()->debug("SqliteQuery::fetchRow 2");
+    if ( result != SQLITE_DONE && row == false ) {
+        Logger::getLogger()->debug("SqliteQuery::fetchRow 3");
+        db_err = sqlite3_errmsg(database);
         throw SqliteException( db_err, "Query '"+query+"' result failed!");
     }
+    Logger::getLogger()->debug("SqliteQuery::fetchRow 4");
     unlock();
 }
 
@@ -2362,9 +2399,13 @@ bool SqliteQuery::validRow() {
 }
 
 bool SqliteQuery::nextRow() {
+    Logger::getLogger()->debug("SqliteQuery::nextRow 1");
     if ( result == -1 ) fetchResult();
+    Logger::getLogger()->debug("SqliteQuery::nextRow 2");
     if ( row == true ) fetchResult();
+    Logger::getLogger()->debug("SqliteQuery::nextRow 3");
     row = (result == SQLITE_ROW);
+    Logger::getLogger()->debug("SqliteQuery::nextRow 4");
     return row;
 }
 

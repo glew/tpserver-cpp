@@ -157,7 +157,7 @@ private:
         void unlock();
         SQLITE* db;
         STATEMENT* stmt;
-        char* db_err;
+        const char* db_err;
 
     void idSetToStream( std::ostringstream& stream, const uint32_t id, const IdSet& idset ) const;
     void idSetToStream( std::ostringstream& stream, const uint32_t id, const uint32_t id2, const IdSet& idset ) const;
@@ -198,7 +198,7 @@ class SqliteQuery {
 
     void fetchResult();
     SQLITE* database;
-    char* db_err;
+    const char* db_err;
     STATEMENT* stmt;
     int result;
     bool row;
