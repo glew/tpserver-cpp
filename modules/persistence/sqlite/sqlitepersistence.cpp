@@ -262,7 +262,7 @@ bool SqlitePersistence::init() {
                 throw std::exception();
             sqlite3_exec(db,"CREATE TABLE player (playerid INT UNSIGNED NOT NULL PRIMARY KEY, name TEXT NOT NULL, "
                     "password TEXT NOT NULL, email TEXT NOT NULL, comment TEXT NOT NULL, boardid INT UNSIGNED NOT NULL, "
-                    "alive TINYINT UNSIGNED NOT NULL, modtime BIGINT NOT NULL, UNIQUE (name(255)));", NULL, 0, &db_err);
+                    "alive TINYINT UNSIGNED NOT NULL, modtime BIGINT NOT NULL, UNIQUE (name));", NULL, 0, &db_err);
             if(db_err != NULL)
                 throw std::exception();
             sqlite3_exec(db,"CREATE TABLE playerscore (playerid INT UNSIGNED NOT NULL, scoreid INT UNSIGNED NOT NULL, scoreval INT UNSIGNED NOT NULL, PRIMARY KEY(playerid, scoreid));", NULL, 0, &db_err);
@@ -439,14 +439,26 @@ bool SqlitePersistence::saveGameInfo(){
 
 bool SqlitePersistence::retrieveGameInfo(){
     try {
+        Logger::getLogger()->debug("SqlitePersistence::retrieveGameInfo 1");
         SqliteQuery query(db, "SELECT * FROM gameinfo;" );
+        Logger::getLogger()->debug("SqlitePersistence::retrieveGameInfo 2");
         query.nextRow();
+        Logger::getLogger()->debug("SqlitePersistence::retrieveGameInfo 3");
         Game* game = Game::getGame();
+        Logger::getLogger()->debug("SqlitePersistence::retrieveGameInfo 4");
         game->setKey(query.get(0));
+        Logger::getLogger()->debug("SqlitePersistence::retrieveGameInfo 5");
         game->setGameStartTime(query.getU64(1));
+        Logger::getLogger()->debug("SqlitePersistence::retrieveGameInfo 6");
         game->setTurnNumber(query.getInt(2));
+        Logger::getLogger()->debug("SqlitePersistence::retrieveGameInfo 7");
         game->setTurnName(query.get(3));
-    } catch (SqliteException& e) { return false; }
+        Logger::getLogger()->debug("SqlitePersistence::retrieveGameInfo 8");
+    } catch (SqliteException& e) {
+        Logger::getLogger()->debug("SqlitePersistence::retrieveGameInfo returns false");
+        return false;
+    }
+    Logger::getLogger()->debug("SqlitePersistence::retrieveGameInfo returns true");
     return true;
 }
 
@@ -1925,6 +1937,7 @@ uint32_t SqlitePersistence::getTableVersion(const std::string& name){
     try {
         return valueQuery( "SELECT version FROM tableversion WHERE name='" + addslashes(name) + "';");
     } catch( SqliteException& e) {
+        Logger::getLogger()->debug("SqlitePersistence::getTableVersion throws error");
         throw std::exception();
     }
 }
