@@ -2158,38 +2158,43 @@ void SqlitePersistence::unlock(){
 }
 
 void SqlitePersistence::idSetToStream( std::ostringstream& stream, const uint32_t id, const IdSet& idset ) const {
+    std::string statement = stream.str();
     for ( IdSet::const_iterator it = idset.begin(); it != idset.end(); ++it ) {
-        if ( it != idset.begin() ) stream << ", ";
+        if ( it != idset.begin() ) stream << "; " << statement;
         stream << "(" << id << ", " << (*it) << ")";
     }
 }
 
 void SqlitePersistence::idSetToStream( std::ostringstream& stream, const uint32_t id, const uint32_t id2, const IdSet& idset ) const {
+    std::string statement = stream.str();
     for ( IdSet::const_iterator it = idset.begin(); it != idset.end(); ++it ) {
-        if ( it != idset.begin() ) stream << ", ";
+        if ( it != idset.begin() ) stream << "; " << statement;
         stream << "(" << id << ", " << id2 << ", " << (*it) << ")";
     }
 }
 
 void SqlitePersistence::idListToStream( std::ostringstream& stream, const uint32_t id, const IdList& idlist ) const {
     uint32_t slotnum = 0;
+    std::string statement = stream.str();
     for(IdList::const_iterator it = idlist.begin(); it != idlist.end(); ++it) {
-        if ( it != idlist.begin() ) stream << ", ";
+        if ( it != idlist.begin() ) stream << "; " << statement;
         stream << "(" << id << ", " << slotnum << ", " << (*it) << ")";
         slotnum++;
     }
 }
 
 void SqlitePersistence::idMapToStream( std::ostringstream& stream, const uint32_t id, const IdMap& idmap ) const {
+    std::string statement = stream.str();
     for ( IdMap::const_iterator it = idmap.begin(); it != idmap.end(); ++it ) {
-        if ( it != idmap.begin() ) stream << ", ";
+        if ( it != idmap.begin() ) stream << "; " << statement;
         stream << "(" << id << ", " << it->first << ", " << it->second << ")";
     }
 }
 
 void SqlitePersistence::idMapToStream( std::ostringstream& stream, const uint32_t id, const uint32_t id2, const IdMap& idmap ) const {
+    std::string statement = stream.str();
     for ( IdMap::const_iterator it = idmap.begin(); it != idmap.end(); ++it ) {
-        if ( it != idmap.begin() ) stream << ", ";
+        if ( it != idmap.begin() ) stream << "; " << statement;
         stream << "(" << id << ", " << id2 << ", " << it->first << ", " << it->second << ")";
     }
 }
@@ -2241,6 +2246,7 @@ void  SqlitePersistence::insertMap ( const std::string& table, uint32_t id, uint
 
 void SqlitePersistence::singleQuery( const std::string& query ) {
     SqliteQuery q( db, query );
+    q.validRow();
 }
 
 uint32_t SqlitePersistence::valueQuery( const std::string& query ) {
