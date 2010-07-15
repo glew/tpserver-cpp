@@ -429,11 +429,12 @@ bool SqlitePersistence::saveGameInfo(){
         querybuilder << "INSERT INTO gameinfo VALUES ('" << addslashes(game->getKey()) << "', ";
         querybuilder << game->getGameStartTime() << ", " << game->getTurnNumber();
         querybuilder << ", '" << game->getTurnName() << "');";
-        const char* querystr = (const char*)((querybuilder.str()).c_str());
-        sqlite3_exec(db, querystr, NULL, 0, &db_err );
+        singleQuery( querybuilder.str() );
     } catch (SqliteException& e ) {
+        Logger::getLogger()->debug("SqlitePersistence::saveGameInfo returns false");
         return false;
     }
+    Logger::getLogger()->debug("SqlitePersistence::saveGameInfo returns true");
     return true;
 }
 
