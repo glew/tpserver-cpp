@@ -2352,7 +2352,7 @@ void SqliteQuery::fetchResult() {
     //result = mysql_store_result(connection);
     //if (result == NULL) //empty result or error
     result = sqlite3_step(stmt);
-    if ( result != SQLITE_DONE && row == false ) {
+    if ( (result != SQLITE_DONE)&&(result != SQLITE_ROW) && row == false ) {
         db_err = sqlite3_errmsg(database);
         throw SqliteException( db_err, "Query '"+query+"' result failed!");
     }
