@@ -1917,13 +1917,14 @@ ComponentView::Ptr SqlitePersistence::retrieveComponentView(uint32_t playerid, u
     }
 }
 
-// CHECK: importance of adding slashes to the name if the string is passed within quotes
 std::string SqlitePersistence::addslashes(const std::string& in) const{
-//    char* buf = new char[in.length() * 2 + 1];
-//    uint len = mysql_real_escape_string(conn, buf, in.c_str(), in.length());
-//    std::string rtv(buf, len);
-//    delete[] buf;
-    return in;
+    std::stringstream ss;
+    std::string out;
+    const char* zText = (const char*)(in.c_str());
+    char* zSQL = sqlite3_mprintf("'%q'",zText);
+    ss << zSQL;
+    ss >> out;
+    return out;
 }
 
 uint32_t SqlitePersistence::getTableVersion(const std::string& name){
