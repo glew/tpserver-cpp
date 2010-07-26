@@ -1150,9 +1150,10 @@ bool SqlitePersistence::saveMessage( boost::shared_ptr< Message > msg){
         if(!refs.empty()){
             querybuilder.str("");
             querybuilder << "INSERT INTO messagereference VALUES ";
+            std::string statement = querybuilder.str();
             for(Message::References::iterator itcurr = refs.begin(); itcurr != refs.end(); ++itcurr){
                 if(itcurr != refs.begin())
-                    querybuilder << ", ";
+                    querybuilder << "; " << statement;
                 querybuilder << "(" << msgid << ", " << (*itcurr).first << ", " << (*itcurr).second << ")";
             }
             singleQuery( querybuilder.str() );
@@ -1473,9 +1474,10 @@ bool SqlitePersistence::saveDesign(Design::Ptr design){
         if(!proplist.empty()){
             querybuilder.str("");
             querybuilder << "INSERT INTO designproperty VALUES ";
+            std::string statement = querybuilder.str();
             for( PropertyValue::Map::iterator itcurr = proplist.begin(); itcurr != proplist.end(); ++itcurr){
                 if(itcurr != proplist.begin())
-                    querybuilder << ", ";
+                    querybuilder << "; " << statement;
                 PropertyValue pv = itcurr->second;
                 querybuilder << "(" << design->getDesignId() << ", " << itcurr->first << ", " << pv.getValue() << ", '";
                 querybuilder << addslashes(pv.getDisplayString()) << "')";
@@ -1602,9 +1604,10 @@ bool SqlitePersistence::saveComponent(Component::Ptr comp){
         if(!proplist.empty()){
             querybuilder.str("");
             querybuilder << "INSERT INTO componentproperty VALUES ";
+            std::string statement = querybuilder.str();
             for(std::map<uint32_t, std::string>::iterator itcurr = proplist.begin(); itcurr != proplist.end(); ++itcurr){
                 if(itcurr != proplist.begin())
-                    querybuilder << ", ";
+                    querybuilder << "; " << statement;
                 querybuilder << "(" << comp->getComponentId() << ", " << itcurr->first << ", '" << addslashes(itcurr->second) << "')";
             }
             querybuilder << ";";
@@ -1800,10 +1803,11 @@ bool SqlitePersistence::saveDesignView(uint32_t playerid, DesignView::Ptr dv){
         if(!proplist.empty()){
             querybuilder.str("");
             querybuilder << "INSERT INTO playerdesignviewprop VALUES ";
+            std::string statement = querybuilder.str();
             for(std::map<uint32_t, PropertyValue>::iterator itcurr = proplist.begin(); itcurr != proplist.end();
                     ++itcurr){
                 if(itcurr != proplist.begin())
-                    querybuilder << ", ";
+                    querybuilder << "; " << statement;
                 querybuilder << "(" << playerid << ", " << dv->getDesignId() << ", " << (itcurr->second.getPropertyId());
                 querybuilder << ", '" << addslashes(itcurr->second.getDisplayString()) << "')";
             }
@@ -1998,10 +2002,11 @@ bool SqlitePersistence::updateResourceListObjectParam(uint32_t objid, uint32_t t
     querybuilder.str("");
     std::map<uint32_t, std::pair<uint32_t, uint32_t> > reslist = rob->getResources();
     querybuilder << "INSERT INTO objectparamresourcelist VALUES ";
+    std::string statement = querybuilder.str();
     for(std::map<uint32_t, std::pair<uint32_t, uint32_t> >::iterator itcurr = reslist.begin();
             itcurr != reslist.end(); ++itcurr){
         if(itcurr != reslist.begin()){
-            querybuilder << ", ";
+            querybuilder << "; " << statement;
         }
         querybuilder << "(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", " << itcurr->first << ", " << itcurr->second.first << ", " << itcurr->second.second << ")";
     }
