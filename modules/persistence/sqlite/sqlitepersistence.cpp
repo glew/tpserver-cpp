@@ -1925,7 +1925,7 @@ std::string SqlitePersistence::addslashes(const std::string& in) const{
     std::stringstream ss;
     std::string out;
     const char* zText = (const char*)(in.c_str());
-    char* zSQL = sqlite3_mprintf("'%q'",zText);
+    char* zSQL = sqlite3_mprintf("%q",zText);
     ss << zSQL;
     ss >> out;
     return out;
