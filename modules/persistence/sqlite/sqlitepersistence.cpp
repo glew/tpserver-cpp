@@ -112,32 +112,13 @@ bool SqlitePersistence::init() {
     const char* database = "/var/tmp/tpserver.db";
     std::string sdb = conf->get("sqlite_db");
     if(sdb.length() != 0)
-        database = sdb.c_str();
-    else{
-        Logger::getLogger()->error("sqlite database name not specified");
-        // TODO: Look into conn and its relevence to sqlite from mysql
-        //sqlite3_close(db) // but db was never opened
-        db = NULL;
-        unlock();
-        return false;
-    }
-    
+        database = sdb.c_str();   
     const char* sock = NULL;
     std::string ssock = conf->get("sqlite_socket");
     if(ssock.length() != 0)
         sock = ssock.c_str();
-    int port = atoi(conf->get("sqlite_port").c_str());
-//    if(mysql_real_connect(conn, host, user, pass, db, port, sock, CLIENT_FOUND_ROWS) == NULL){
-//        Logger::getLogger()->error("Could not connect to sql");
-//        conn = NULL;
-//        unlock();
-//        return false;
-//    }
 
-    //Testing fixed absolute db path
-    const char* databasefile = "/var/tmp/tpserver.db";
-
-    if (sqlite3_open(databasefile, &db)){
+    if (sqlite3_open(database, &db)){
         Logger::getLogger()->error("Can't open database: %s\n", sqlite3_errmsg(db));
         sqlite3_close(db);
         unlock();
@@ -1515,9 +1496,10 @@ bool SqlitePersistence::updateDesign(Design::Ptr design){
         if(!proplist.empty()){
             querybuilder.str("");
             querybuilder << "INSERT INTO designproperty VALUES ";
+            std::string statement = querybuilder.str();
             for(PropertyValue::Map::iterator itcurr = proplist.begin(); itcurr != proplist.end(); ++itcurr){
                 if(itcurr != proplist.begin())
-                    querybuilder << ", ";
+                    querybuilder << "; " << statement;
                 PropertyValue pv = itcurr->second;
                 querybuilder << "(" << design->getDesignId() << ", " << itcurr->first << ", " << pv.getValue() << ", '";
                 querybuilder << addslashes(pv.getDisplayString()) << "')";
