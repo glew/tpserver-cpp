@@ -1904,13 +1904,9 @@ ComponentView::Ptr SqlitePersistence::retrieveComponentView(uint32_t playerid, u
 }
 
 std::string SqlitePersistence::addslashes(const std::string& in) const{
-    std::stringstream ss;
-    std::string out;
     const char* zText = (const char*)(in.c_str());
     char* zSQL = sqlite3_mprintf("%q",zText);
-    ss << zSQL;
-    ss >> out;
-    return out;
+    return std::string(zSQL);
 }
 
 uint32_t SqlitePersistence::getTableVersion(const std::string& name){
