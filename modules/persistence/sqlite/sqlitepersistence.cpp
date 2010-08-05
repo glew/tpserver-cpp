@@ -1593,6 +1593,8 @@ bool SqlitePersistence::saveComponent(Component::Ptr comp){
                 querybuilder << "(" << comp->getComponentId() << ", " << itcurr->first << ", '" << addslashes(itcurr->second) << "')";
             }
             querybuilder << ";";
+            Logger::getLogger()->warning("ComponentProperty insert:");
+            Logger::getLogger()->warning(querybuilder.str().c_str());
             singleQuery( querybuilder.str() );
         }
         return true;
@@ -2230,8 +2232,7 @@ void  SqlitePersistence::insertMap ( const std::string& table, uint32_t id, uint
 }
 
 void SqlitePersistence::singleQuery( const std::string& query ) {
-    SqliteQuery q( db, query );
-    q.validRow();
+    sqlite3_exec(db, query.c_str(), NULL, 0, &db_err);
 }
 
 uint32_t SqlitePersistence::valueQuery( const std::string& query ) {
