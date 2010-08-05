@@ -960,9 +960,10 @@ bool SqlitePersistence::updateListParameter(uint32_t queueid, uint32_t ordid, ui
     if(!list.empty()){
         querybuilder.str("");
         querybuilder << "INSERT INTO orderparamlist VALUES ";
+        std::string statement = querybuilder.str();
         for(IdMap::iterator itcurr = list.begin(); itcurr != list.end(); ++itcurr){
             if(itcurr != list.begin())
-                querybuilder << ", ";
+                querybuilder << "; " << statement;
             querybuilder << "(" << queueid << ", " << ordid << ", " << pos << ", " << (*itcurr).first << ", " << (*itcurr).second << ")";
         }
         querybuilder << ";";
@@ -1593,8 +1594,6 @@ bool SqlitePersistence::saveComponent(Component::Ptr comp){
                 querybuilder << "(" << comp->getComponentId() << ", " << itcurr->first << ", '" << addslashes(itcurr->second) << "')";
             }
             querybuilder << ";";
-            Logger::getLogger()->warning("ComponentProperty insert:");
-            Logger::getLogger()->warning(querybuilder.str().c_str());
             singleQuery( querybuilder.str() );
         }
         return true;
@@ -2047,10 +2046,11 @@ bool SqlitePersistence::updateRefQuantityListObjectParam(uint32_t objid, uint32_
     querybuilder.str("");
     std::map<std::pair<int32_t, uint32_t>, uint32_t> reflist = rob->getRefQuantityList();
     querybuilder << "INSERT INTO objectparamrefquantitylist VALUES ";
+    std::string statement = querybuilder.str();
     for(std::map<std::pair<int32_t, uint32_t>, uint32_t>::iterator itcurr = reflist.begin();
             itcurr != reflist.end(); ++itcurr){
         if(itcurr != reflist.begin()){
-            querybuilder << ", ";
+            querybuilder << "; " << statement;
         }
         querybuilder << "(" << objid << ", " << turn << ", " << plid << ", " << pgroup << ", " << pgpos << ", " << itcurr->first.first << ", " << itcurr->first.second << ", " << itcurr->second << ")";
     }
