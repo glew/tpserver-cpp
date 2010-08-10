@@ -26,6 +26,12 @@
             <default>0</default>
             <commandstring>--turn_length %d</commandstring>
         </parameter>
+	<parameter name="persistence" type="S">
+	    <longname>Persistence Module</longname>
+	    <description>Persistence module used with server (tpmysql or tpsqlite).</description>
+	    <default></default>
+	    <commandstring>--persistence %s</commandstring>
+	</parameter>
         <ruleset name="risk">
             <longname>Risk</longname>
             <version>0</version>
