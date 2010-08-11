@@ -97,26 +97,15 @@ bool SqlitePersistence::init() {
     }
     Settings* conf = Settings::getSettings();
     
-    const char* host = NULL;
-    std::string shost = conf->get("sqlite_host");
-    if(shost.length() != 0)
-        host = shost.c_str();
-    const char* user = NULL;
-    std::string suser = conf->get("sqlite_user");
-    if(suser.length() != 0)
-        user = suser.c_str();
-    const char* pass = NULL;
-    std::string spass = conf->get("sqlite_pass");
-    if(spass.length() != 0)
-        pass = spass.c_str();
-    const char* database = "/var/tmp/tpserver.db";
+    const char* database = NULL;
     std::string sdb = conf->get("sqlite_db");
     if(sdb.length() != 0)
-        database = sdb.c_str();   
-    const char* sock = NULL;
-    std::string ssock = conf->get("sqlite_socket");
-    if(ssock.length() != 0)
-        sock = ssock.c_str();
+        database = sdb.c_str();
+    else{
+        Logger::getLogger()->error("sqlite database location not specified");
+        unlock();
+        return false;
+    }
 
     if (sqlite3_open(database, &db)){
         Logger::getLogger()->error("Can't open database: %s\n", sqlite3_errmsg(db));
