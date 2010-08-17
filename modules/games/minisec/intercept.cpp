@@ -1,4 +1,4 @@
-/*  Move order
+/*  Interception Order
  *
  *  Copyright (C) 2004-2005, 2007, 2008  Lee Begg and the Thousand Parsec Project
  *
@@ -24,7 +24,6 @@
 #include <tpserver/game.h>
 #include <tpserver/logging.h>
 #include <tpserver/player.h>
-#include "fleet.h"
 #include <tpserver/message.h>
 #include <tpserver/playermanager.h>
 #include <tpserver/orderparameters.h>
@@ -33,83 +32,100 @@
 #include <tpserver/sizeobjectparam.h>
 #include <tpserver/ordermanager.h>
 #include <tpserver/orderqueue.h>
+#include <tpserver/orderparameters.h>
+#include <tpserver/objecttypemanager.h>
 
-#include "move.h"
+#include "planet.h"
+#include "emptyobject.h"
+#include "fleet.h"
 
-Move::Move() : Order()
+#include "intercept.h"
+
+Intercept::Intercept() : Order()
 {
-  name = "Move";
-  description = "Move to a given position absolute in space";
+  name = "Intercept";
+  description = "Intercept a given ship";
   
-  coords = (SpaceCoordParam*) addOrderParameter( new SpaceCoordParam( "pos", "The position in space to move to") );
+  uint32_t fleet_type = Game::getGame()->getObjectTypeManager()->getObjectTypeByName("Fleet");
+  std::set<objecttypeid_t> fleet_set;
+  fleet_set.insert(fleet_type);
+  destination = (ObjectOrderParameter*) addOrderParameter(new ObjectOrderParameter( "Fleet", "The fleet to intercept", fleet_set) );
 }
 
-Move::~Move(){
+Intercept::~Intercept(){
 }
 
-Vector3d Move::getDest() const
-{
-	return coords->getPosition();
-}
-
-
-void Move::setDest(const Vector3d & ndest)
-{
-  coords->setPosition(ndest);
-}
-
-int Move::getETA(IGObject::Ptr ob) const{
-  Fleet* fleet = ((Fleet*)(ob->getObjectBehaviour()));
-  uint64_t distance = coords->getPosition().getDistance(fleet->getPosition());
-  uint32_t max_speed = fleet->maxSpeed();
-  
-  if(distance == 0) 
-    return 1;
-  return (int)((distance - 1) / max_speed) + 1;
-}
-
-void Move::createFrame(OutputFrame::Ptr f, int pos)
+void Intercept::createFrame(OutputFrame::Ptr f, int pos)
 {
   Game* game = Game::getGame();
   IGObject::Ptr obj = game->getObjectManager()->getObject(game->getOrderManager()->getOrderQueue(orderqueueid)->getObjectId());
-  if(obj != NULL){
-    turns = getETA(obj);
+  if(obj != NULL && destination->getObjectId() != 0){
     game->getObjectManager()->doneWithObject(obj->getID());
   }else{
     turns = 0;
-    Logger::getLogger()->error("Move create frame: object not found, id = %d", game->getOrderManager()->getOrderQueue(orderqueueid)->getObjectId());
+    Logger::getLogger()->error("Intercept create frame: object not found, id = %d", obj->getID());
   }
   
   Order::createFrame(f, pos);	
 }
 
-void Move::inputFrame(InputFrame::Ptr f, uint32_t playerid)
+void Intercept::inputFrame(InputFrame::Ptr f, uint32_t playerid)
 {
   Order::inputFrame(f, playerid);
 }
 
-bool Move::doOrder(IGObject::Ptr ob){
-  Vector3d dest = coords->getPosition();
-  Fleet* fleet = ((Fleet*)(ob->getObjectBehaviour()));
-  uint64_t distance = dest.getDistance(fleet->getPosition());
-  uint64_t max_speed = fleet->maxSpeed();
+ObjectOrderParameter* Intercept::getDestination()
+{
+  return destination;
+}
 
-  Logger::getLogger()->debug("Object(%d)->Move->doOrder(): Moving %lld at %lld speed (will take about %lld turns)", 
-	ob->getID(), distance, max_speed, distance/max_speed);
-  if(distance <= max_speed){
+bool Intercept::doOrder(IGObject::Ptr ob){
+
+  if (destination->getObjectId() == 0)
+    return true;
+
+  Fleet* me = dynamic_cast<Fleet*>(ob->getObjectBehaviour());
+  if (me == NULL)
+    return false;
+
+  ObjectManager* om = Game::getGame()->getObjectManager();
+  ObjectTypeManager* otm = Game::getGame()->getObjectTypeManager();
+  IGObject::Ptr d = om->getObject(destination->getObjectId());
+
+  SpaceObject* dest_object;
+
+  if (d->getType() == otm->getObjectTypeByName("Fleet"))
+    dest_object = dynamic_cast<Fleet*>(d->getObjectBehaviour());
+  else if (d->getType() == otm->getObjectTypeByName("Planet"))
+    dest_object = dynamic_cast<Planet*>(d->getObjectBehaviour());
+  else if (d->getType() == otm->getObjectTypeByName("System"))
+    dest_object = dynamic_cast<EmptyObject*>(d->getObjectBehaviour());
+  else
+    return false;
+
+  Vector3d dest = dest_object->getPosition();
+  Vector3d velocity = dest_object->getVelocity();
+  Vector3d previous = dest - velocity;
+
+  uint64_t my_speed = me->maxSpeed(); 
+  uint64_t distance = dest.getDistance(me->getPosition());
+
+  Logger::getLogger()->debug("Object(%d)->Intercept->doOrder(): Moving %lld at %lld speed (will take about %lld turns)", 
+	ob->getID(), distance, my_speed, distance/my_speed);
+  if(distance <= my_speed) {
     uint32_t parentid;
 
-    Logger::getLogger()->debug("Object(%d)->Move->doOrder(): Is arriving at [%lld, %lld, %lld] ", 
+    Logger::getLogger()->debug("Object(%d)->Intercept->doOrder(): Is arriving at [%lld, %lld, %lld] ", 
       ob->getID(), dest.getX(), dest.getY(), dest.getZ());
   
-    fleet->setVelocity(Vector3d(0,0,0));
+    me->setVelocity(Vector3d(0,0,0));
     parentid = ob->getParent();
 
     // recontainerise if necessary
     int containertype = Game::getGame()->getObjectManager()->getObject(parentid)->getContainerType();
     Game::getGame()->getObjectManager()->doneWithObject(parentid);
   
-    if(fleet->getPosition() != dest && containertype >= 1){
+    if(me->getPosition() != dest && containertype >= 1){
       //removeFromParent();
       std::set<uint32_t> oblist = ((MinisecTurn*)(Game::getGame()->getTurnProcess()))->getContainerIds();
       for(std::set<uint32_t>::reverse_iterator itcurr = oblist.rbegin(); itcurr != oblist.rend(); ++itcurr){
@@ -125,13 +141,13 @@ bool Move::doOrder(IGObject::Ptr ob){
         uint64_t size1 = size->getSize();
         
         uint64_t diff = dest.getDistance(pos1);
-        if(diff <= fleet->getSize() / 2 + size1 / 2){
+        if(diff <= me->getSize() / 2 + size1 / 2){
         
           Logger::getLogger()->debug("Container object %d", *itcurr);
           //if(Game::getGame()->getObject(*itcurr)->getType() <= 2){
           //if(*itcurr != id){
           
-          if(size1 >= fleet->getSize()){
+          if(size1 >= me->getSize()){
             if(*itcurr != parentid){
                 ob->removeFromParent();
                 ob->addToParent(*itcurr);
@@ -150,32 +166,45 @@ bool Move::doOrder(IGObject::Ptr ob){
       }
     }
     
-    fleet->setPosition(dest);
+    me->setPosition(dest);
     
     Message::Ptr msg( new Message() );
-    msg->setSubject("Move order complete");
+    msg->setSubject("Intercept order complete");
     msg->setBody("The fleet '" +  ob->getName() + "' has reached it's destination.");
     msg->addReference(rst_Action_Order, rsorav_Completion);
     msg->addReference(rst_Object, ob->getID());
     msg->addReference(rst_Object, parentid); /* It's parent */
-    Game::getGame()->getPlayerManager()->getPlayer(fleet->getOwner())->postToBoard(msg);
+    Game::getGame()->getPlayerManager()->getPlayer(me->getOwner())->postToBoard(msg);
 
     return true;
 
   }else{
-    Vector3d velo = (dest - fleet->getPosition()).makeLength(max_speed);
-    Vector3d arriveat = fleet->getPosition()+velo;
-    Logger::getLogger()->debug("Move->doOrder(%d): Velocity is [%lld, %lld, %lld] (will arrive at [%lld, %lld, %lld])", 
-      ob->getID(), velo.getX(), velo.getY(), velo.getZ(), arriveat.getX(), arriveat.getY(), arriveat.getZ());
 
-    fleet->setVelocity(velo);
+    int num_turns = 1;
+    Vector3d calculated_pos = me->getPosition();
+
+    while (dest.getDistance(calculated_pos) > my_speed*num_turns)
+    {
+      dest = dest + velocity;
+      num_turns++;
+      if (num_turns >= 50)
+        return true;
+    }
+    turns = num_turns;
+
+    Vector3d velo = (dest - me->getPosition()).makeLength(my_speed);
+    Vector3d arriveat = me->getPosition()+velo;
+    Logger::getLogger()->debug("Intercept->doOrder(%d): Velocity is [%lld, %lld, %lld] (will arrive at [%lld, %lld, %lld] in [%d] turns!)", 
+      ob->getID(), velo.getX(), velo.getY(), velo.getZ(), arriveat.getX(), arriveat.getY(), arriveat.getZ(), num_turns);
+
+    me->setVelocity(velo);
 
     uint32_t parentid = ob->getParent();
     // recontainerise if necessary
     uint32_t containertype = Game::getGame()->getObjectManager()->getObject(parentid)->getContainerType();
     Game::getGame()->getObjectManager()->doneWithObject(parentid);
   
-    if(fleet->getPosition() != arriveat && containertype >= 1){
+    if(me->getPosition() != arriveat && containertype >= 1){
       //removeFromParent();
       std::set<uint32_t> oblist = ((MinisecTurn*)(Game::getGame()->getTurnProcess()))->getContainerIds();
       for(std::set<uint32_t>::reverse_iterator itcurr = oblist.rbegin(); itcurr != oblist.rend(); ++itcurr){
@@ -191,13 +220,13 @@ bool Move::doOrder(IGObject::Ptr ob){
         uint64_t size1 = size->getSize();
         
         uint64_t diff = arriveat.getDistance(pos1);
-        if(diff <= fleet->getSize() / 2 + size1 / 2){
+        if(diff <= me->getSize() / 2 + size1 / 2){
         
           Logger::getLogger()->debug("Container object %d", *itcurr);
           //if(Game::getGame()->getObject(*itcurr)->getType() <= 2){
           //if(*itcurr != id){
           
-          if(size1 >= fleet->getSize()){
+          if(size1 >= me->getSize()){
             if(*itcurr != parentid){
                 ob->removeFromParent();
                 ob->addToParent(*itcurr);
@@ -216,14 +245,14 @@ bool Move::doOrder(IGObject::Ptr ob){
       }
     }
     
-    fleet->setPosition(arriveat);
+    me->setPosition(arriveat);
     
     return false;
   }
 }
 
-Order* Move::clone() const{
-  Move *nm = new Move();
+Order* Intercept::clone() const{
+  Intercept *nm = new Intercept();
   nm->type = type;
   return nm;
 }

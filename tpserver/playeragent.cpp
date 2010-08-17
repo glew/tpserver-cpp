@@ -193,6 +193,12 @@ void PlayerAgent::processIGFrame( InputFrame::Ptr frame ){
     case ft04_PlayerIds_Get:
       processGetPlayerIds(frame);
       break;
+    case ft04_OrderQueue_Get:
+      processGetOrderQueue(frame);
+      break;
+    case ft04_OrderQueueIds_Get:
+      processGetOrderQueueIds(frame);
+      break;
     default:
       WARNING("PlayerAgent: Discarded frame, not processed, was type %d", frame->getType());
       throw FrameException( fec_ProtocolError, "Did not understand that frame type.");
@@ -427,12 +433,7 @@ void PlayerAgent::processGetOrder( InputFrame::Ptr frame ){
 
   lengthCheck( frame, 8 + 4 * num_orders );
 
-  if(num_orders > 1) {
-    DEBUG("Got multiple orders, returning a sequence");
-    temp_connection->sendSequence(frame,num_orders);
-  } else {
-    DEBUG("Got single orders, returning one object");
-  }
+  temp_connection->sendSequence(frame,num_orders);
 
   if(num_orders == 0){
     RefList reflist;
@@ -458,6 +459,71 @@ void PlayerAgent::processGetOrder( InputFrame::Ptr frame ){
 
 }
 
+void PlayerAgent::processGetOrderQueue( InputFrame::Ptr frame ){
+  DEBUG("doing get orderqueue frame");
+  if(frame->getDataLength() < 4){
+    throw FrameException(fec_FrameError, "Invalid frame, too short");
+  }
+  int len = queryCheck(frame);
+  
+  for(int i = 0; i < len; i++){
+    uint32_t oqid = frame->unpackInt();
+    OrderQueue::Ptr oq = Game::getGame()->getOrderManager()->getOrderQueue(oqid);
+    if(oq && (oq->isOwner(player->getID()) || oqid == 0)){
+      OutputFrame::Ptr of = temp_connection->createFrame(frame);
+      try{
+        oq->pack(of);
+        temp_connection->sendFrame(of);
+      }catch(FrameException e){
+        temp_connection->sendFail(frame, e);
+      }
+    }else{
+      temp_connection->sendFail(frame, fec_NonExistant, "No such orderqueue");
+    }
+  }
+}
+
+void PlayerAgent::processGetOrderQueueIds( InputFrame::Ptr frame ){
+  DEBUG("doing get orderqueue ids frame");
+  if((frame->getDataLength() != 12 && frame->getVersion() == fv0_3) ||
+     (frame->getDataLength() != 20 && frame->getVersion() >= fv0_4)){
+    throw FrameException(fec_FrameError, "Invalid frame");
+  }
+  uint32_t seqnum = frame->unpackInt();
+  uint32_t snum = frame->unpackInt();
+  uint32_t numtoget = frame->unpackInt();
+  uint64_t fromserial = UINT64_NEG_ONE;
+  if(frame->getVersion() >= fv0_4){
+    fromserial = frame->unpackInt64();
+  }
+  
+  if(seqnum == UINT32_NEG_ONE){
+    seqnum = 1;
+  }
+  
+  //gen list
+  IdModList oqids;
+  
+  std::map<uint32_t, OrderQueue::Ptr> orderqueues = Game::getGame()->getOrderManager()->getOrderQueues();
+
+  for(std::map<uint32_t, OrderQueue::Ptr>::iterator itoq = orderqueues.begin(); itoq != orderqueues.end(); ++itoq){
+    if(itoq->second->isOwner(player->getID()) || itoq->first == 0){
+      if(fromserial == UINT64_NEG_ONE || itoq->second->getModTime() > fromserial){
+        oqids[itoq->first] = itoq->second->getModTime();
+      }
+    }
+  }
+
+  if(snum > oqids.size()){
+    throw FrameException(fec_NonExistant, "Start number too high");
+  }
+
+  if(numtoget > oqids.size() - snum){
+    numtoget = oqids.size() - snum;
+  }
+ 
+  temp_connection->sendModList(frame, ft04_OrderQueueIds_List, seqnum, oqids, numtoget, snum, fromserial); 
+}  
 
 void PlayerAgent::processAddOrder( InputFrame::Ptr frame ){
   DEBUG("doing add order frame");
@@ -559,9 +625,7 @@ void PlayerAgent::processRemoveOrder( InputFrame::Ptr frame ){
 
   lengthCheckMin( frame, 8 + 4 * num_orders  );
 
-  if(num_orders > 1){
-    temp_connection->sendSequence(frame,num_orders);
-  }
+  temp_connection->sendSequence(frame,num_orders);
 
   for(int i = 0; i < num_orders; i++){
     int ordpos = frame->unpackInt();
@@ -759,9 +823,7 @@ void PlayerAgent::processGetMessages( InputFrame::Ptr frame ){
 
   lengthCheckMin( frame, 8 + 4 * nummsg );
 
-  if(nummsg > 1){
-    temp_connection->sendSequence(frame,nummsg);
-  }
+  temp_connection->sendSequence(frame,nummsg);
 
   if(nummsg == 0){
     throw FrameException( fec_FrameError, "No messages to get");
@@ -843,9 +905,7 @@ void PlayerAgent::processRemoveMessages( InputFrame::Ptr frame ){
 
   lengthCheckMin( frame, 8 + 4 * nummsg );
 
-  if(nummsg > 1){
-    temp_connection->sendSequence(frame, nummsg);
-  }
+  temp_connection->sendSequence(frame, nummsg);
 
   Board::Ptr currboard;
   //HACK
@@ -1267,9 +1327,7 @@ int PlayerAgent::queryCheck( InputFrame::Ptr frame )
   }
 
   lengthCheckMin( frame, 4 + 4 * result );
-  if(result > 1){
-    temp_connection->sendSequence( frame, result );
-  }
+  temp_connection->sendSequence( frame, result );
 
   return result;
 }

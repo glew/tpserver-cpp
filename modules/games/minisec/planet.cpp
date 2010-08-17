@@ -19,6 +19,8 @@
  */
 
 #include <tpserver/object.h>
+#include <tpserver/objectmanager.h>
+#include <tpserver/objecttypemanager.h>
 #include <tpserver/order.h>
 #include <tpserver/ordermanager.h>
 #include <tpserver/game.h>
@@ -29,7 +31,7 @@
 
 #include "planet.h"
 
-PlanetType::PlanetType():OwnedObjectType("Planet", "A planet object"){
+PlanetType::PlanetType():OwnedObjectType("Planet", "A planet object") {
   ObjectParameterGroupDesc::Ptr group = createParameterGroupDesc("Resources","The planets resources");
   group->addParameter(obpT_Resource_List, "Resource List", "The resource list of the resources the planet has available");
 }
@@ -70,6 +72,7 @@ void Planet::packExtraData(OutputFrame::Ptr frame){
         frame->packInt(itcurr->second.second);
         frame->packInt(0);
     }
+
 }
 
 void Planet::doOnceATurn()
@@ -90,7 +93,7 @@ std::map<uint32_t, std::pair<uint32_t, uint32_t> > Planet::getResources(){
 uint32_t Planet::getResource(uint32_t restype) const{
   std::map<uint32_t, std::pair<uint32_t, uint32_t> > reslist = ((ResourceListObjectParam*)(obj->getParameter(RESGRPID,RESPARAMID)))->getResources();
   if(reslist.find(restype) != reslist.end()){
-    return reslist.find(restype)->first;
+    return reslist.find(restype)->second.first;
   }
   return 0;
 }
@@ -122,4 +125,36 @@ bool Planet::removeResource(uint32_t restype, uint32_t amount){
         }
     }
     return false;
+}
+
+
+IGObject::Ptr Planet::createObject(IGObject::Ptr parent, std::string name, Vector3d v, uint32_t size, std::string media) {
+
+  Game* game = Game::getGame();
+  ObjectManager* obman = game->getObjectManager();
+  ObjectTypeManager* otypeman = game->getObjectTypeManager();
+
+  EmptyObject* theparent = (EmptyObject*)(parent->getObjectBehaviour());
+
+  IGObject::Ptr planet = game->getObjectManager()->createNewObject();
+  otypeman->setupObject(planet, otypeman->getObjectTypeByName("Planet"));
+
+  planet->setName(name);
+  planet->addToParent(parent->getID());
+
+  Planet* theplanet = (Planet*)(planet->getObjectBehaviour());
+  theplanet->setSize(2);
+  theplanet->setPosition(theparent->getPosition() + v);
+  uint32_t queueid = game->getOrderManager()->addOrderQueue(planet->getID(), 0);
+
+  OrderQueueObjectParam* oqop = static_cast<OrderQueueObjectParam*>(planet->getParameterByType(obpT_Order_Queue));
+  oqop->setQueueId(queueid);
+
+  theplanet->setDefaultOrderTypes();
+  theplanet->setIcon("common/object-icons/planet");
+  theplanet->setMedia(std::string("common-2d/foreign/freeorion/planet-small/animation/") + media);
+
+  obman->addObject(planet);
+
+  return planet;
 }

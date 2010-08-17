@@ -22,6 +22,8 @@
 #include "net.h"
 #include "timercallback.h"
 #include "protocol.h"
+#include "game.h"
+#include "playermanager.h"
 
 #include "playersfinishedturntimer.h"
 
@@ -46,7 +48,15 @@ void PlayersFinishedTurnTimer::resetTimer(){
 }
 
 void PlayersFinishedTurnTimer::onPlayerFinishedTurn(){
-    if(getNumActivePlayers() > 1 && getNumActivePlayers() == getNumDonePlayers()){
-        allDoneStartEOT();
+    uint32_t minPlayers = 2;
+    Settings* settings = Settings::getSettings();
+    if(settings->get("turn_players_min").length() > 0){
+        minPlayers = atoi(settings->get("turn_players_min").c_str());
+    }
+    bool requireActivePlayer = (settings->get("turn_require_active_players") == "yes");
+    if(Game::getGame()->getPlayerManager()->getNumPlayers() >= minPlayers){
+        if((getNumActivePlayers() > 1 || !requireActivePlayer) && getNumActivePlayers() == getNumDonePlayers()){
+            allDoneStartEOT();
+        }
     }
 }

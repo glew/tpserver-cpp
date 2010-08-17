@@ -20,6 +20,7 @@
 
 #include <string>
 #include <vector>
+#include <algorithm>
 #include <boost/format.hpp>
 
 #include <tpserver/object.h>
@@ -39,6 +40,7 @@
 #include <tpserver/orderqueueobjectparam.h>
 #include <tpserver/designstore.h>
 #include <tpserver/design.h>
+#include <tpserver/resourcemanager.h>
 #include <tpserver/battlexml/battlelogger.h>
 #include "combatant.h"
 
@@ -74,6 +76,7 @@ void RSPCombat::doCombat(std::map<uint32_t, IdSet> sides){
     std::map<uint32_t, std::vector<Combatant*> > fleetcache;
     
     battlelogger.reset(new BattleXML::BattleLogger());
+    msgstrings.clear();
     
     for(std::map<uint32_t, IdSet>::iterator itmap = sides.begin(); itmap != sides.end(); ++itmap){
         std::vector<Combatant*> pcombatant;
@@ -94,7 +97,7 @@ void RSPCombat::doCombat(std::map<uint32_t, IdSet> sides){
                         f1->setOwner(itmap->first);
                         f1->setObject(obj->getID());
                         f1->setShipType(itship->first);
-                        uint32_t mydamage = damage / (shiplist.size() - i);
+                        uint32_t mydamage = damage / std::max(1U, (unsigned int)(shiplist.size() - i));
                         f1->setDamage(mydamage);
                         damage -= mydamage;
                         std::string type = ds->getDesign(itship->first)->getName();
@@ -107,7 +110,8 @@ void RSPCombat::doCombat(std::map<uint32_t, IdSet> sides){
                 }
             }else{
                 int shipcount = 2;
-                if(((Planet*)(obj->getObjectBehaviour()))->getResource(2) == 1){
+                int homeplanetid = game->getResourceManager()->getResourceDescription("Home Planet")->getResourceType();
+                if(((Planet*)(obj->getObjectBehaviour()))->getResource(homeplanetid) == 1){
                     //three more for home planets
                     shipcount += 3;
                 }
@@ -242,7 +246,7 @@ void RSPCombat::doCombat(std::map<uint32_t, IdSet> sides){
         if(isAllDead(f1)){
             msgstrings[ownerid1] += str(boost::format("Your fleet was destroyed by %1%'s fleet. ") % p2name);
             msgstrings[ownerid2] += str(boost::format("You destroyed %1%'s fleet. ") % p1name);
-            std::string deathmsg = str(boost::format("%1%'s fleet destoryed %2%'s fleet. ") % p1name % p2name);
+            std::string deathmsg = str(boost::format("%1%'s fleet destroyed %2%'s fleet. ") % p1name % p2name);
             for(std::map<uint32_t, std::string>::iterator msgit = msgstrings.begin(); 
                     msgit != msgstrings.end(); ++msgit){
                 if(msgit->first == ownerid1 || msgit->first == ownerid2)
@@ -257,9 +261,9 @@ void RSPCombat::doCombat(std::map<uint32_t, IdSet> sides){
             fleetcache.erase(itpa);
         }
         if(isAllDead(f2)){
-            msgstrings[ownerid1] += str(boost::format("Your fleet was destroyed by %1%'s fleet. ") % p1name);
-            msgstrings[ownerid2] += str(boost::format("You destroyed %1%'s fleet. ") % p2name);
-            std::string deathmsg = str(boost::format("%1%'s fleet destoryed %2%'s fleet. ") % p2name % p1name);
+            msgstrings[ownerid2] += str(boost::format("Your fleet was destroyed by %1%'s fleet. ") % p1name);
+            msgstrings[ownerid1] += str(boost::format("You destroyed %1%'s fleet. ") % p2name);
+            std::string deathmsg = str(boost::format("%1%'s fleet destroyed %2%'s fleet. ") % p2name % p1name);
             for(std::map<uint32_t, std::string>::iterator msgit = msgstrings.begin(); 
                     msgit != msgstrings.end(); ++msgit){
                 if(msgit->first == ownerid1 || msgit->first == ownerid2)
@@ -280,18 +284,19 @@ void RSPCombat::doCombat(std::map<uint32_t, IdSet> sides){
     
     std::string file = battlelogger->save();
     
-    std::vector<Combatant*> flast = fleetcache.begin()->second;
-    resolveCombatantsToObjects(flast);
-    msgstrings[flast[0]->getOwner()] += "Your Fleet survived combat.";
-    for(std::vector<Combatant*>::iterator itcombatant = flast.begin(); itcombatant != flast.end();
-            ++itcombatant){
-        delete *itcombatant;
-    }
-    fleetcache.erase(fleetcache.begin());
     if(!fleetcache.empty()){
-        Logger::getLogger()->warning("fleetcache not empty at end of combat");
+      std::vector<Combatant*> flast = fleetcache.begin()->second;
+      resolveCombatantsToObjects(flast);
+      msgstrings[flast[0]->getOwner()] += "Your Fleet survived combat.";
+      for(std::vector<Combatant*>::iterator itcombatant = flast.begin(); itcombatant != flast.end();
+              ++itcombatant){
+          delete *itcombatant;
+      }
+      fleetcache.erase(fleetcache.begin());
+      if(!fleetcache.empty()){
+          Logger::getLogger()->warning("fleetcache not empty at end of combat");
+      }
     }
-    
     for(std::map<uint32_t, std::string>::iterator msgit = msgstrings.begin(); 
         msgit != msgstrings.end(); ++msgit){
         Message::Ptr msg( new Message() );
@@ -332,7 +337,7 @@ std::map<Combatant*, uint32_t> RSPCombat::buildShotList(std::vector<Combatant*> 
             if(!isDraw && shot == 0){
                 scoutcount++;
             }
-            if((*itc)->getShipType() == biggestaliveshiptype){
+            if(!(isDraw && shot == 0) && (*itc)->getShipType() == biggestaliveshiptype){
                 shotlist[*itc] = shot;
             }
         }
@@ -402,6 +407,8 @@ void RSPCombat::resolveCombatantsToObjects(std::vector<Combatant*> combatants){
     
     std::map<objectid_t, bool> colonydead;
     
+    std::map<objectid_t, uint32_t> damagemap;
+    
     for(std::vector<Combatant*>::iterator itcombat = combatants.begin(); itcombat != combatants.end(); ++itcombat){
         Combatant* combatant = *itcombat;
         if(combatant->getShipType() == 0){
@@ -422,11 +429,31 @@ void RSPCombat::resolveCombatantsToObjects(std::vector<Combatant*> combatants){
                     //message player
                     msgstrings[combatant->getOwner()] += str(boost::format("Your fleet %1% was destroyed. ") % obj->getName());
                     //remove object
+                    uint32_t queueid = static_cast<OrderQueueObjectParam*>(obj->getParameterByType(obpT_Order_Queue))->getQueueId();
+                    OrderQueue::Ptr queue = Game::getGame()->getOrderManager()->getOrderQueue(queueid);
+                    queue->removeOwner(combatant->getOwner());
+                    queue->removeAllOrders();
                     Game::getGame()->getObjectManager()->scheduleRemoveObject(obj->getID());
                     Game::getGame()->getPlayerManager()->getPlayer(fleet->getOwner())->getPlayerView()->removeOwnedObject(obj->getID());
                 }
             }
+        }else{
+            if(damagemap.find(combatant->getObject()) == damagemap.end()){
+                damagemap[combatant->getObject()] = combatant->getDamage();
+            }else{
+                damagemap[combatant->getObject()] += combatant->getDamage();
+            }
         }
+    }
+    
+    for(std::map<objectid_t, uint32_t>::iterator itobj = damagemap.begin(); itobj != damagemap.end(); ++itobj){
+        IGObject::Ptr obj = objectcache[itobj->first];
+        Fleet* fleet = dynamic_cast<Fleet*>(obj->getObjectBehaviour());
+        if(fleet == NULL){
+            warningLog("Fleet was not a fleet");
+            continue;
+        }
+        fleet->setDamage(itobj->second);
     }
 
     for(std::map<objectid_t, bool>::iterator itplanet = colonydead.begin(); itplanet != colonydead.end(); ++itplanet){
@@ -437,11 +464,12 @@ void RSPCombat::resolveCombatantsToObjects(std::vector<Combatant*> combatants){
                 warningLog("Planet was not a planet");
                 continue;
             }
-            bool ishomeplanet = (planet->getResource(2) == 1);
+            resourcetypeid_t homeplanetres = Game::getGame()->getResourceManager()->getResourceDescription("Home Planet")->getResourceType();
+            bool ishomeplanet = (planet->getResource(homeplanetres) == 1);
             
             //planet has fallen
             if(ishomeplanet){
-                planet->removeResource(2, 1);
+                planet->removeResource(homeplanetres, 1);
             }
             uint32_t oldowner = planet->getOwner();
             planet->setOwner(0);

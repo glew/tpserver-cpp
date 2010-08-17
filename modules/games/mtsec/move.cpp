@@ -73,6 +73,11 @@ int Move::getETA(IGObject::Ptr ob) const{
   return (int)((distance - 1) / max_speed) + 1;
 }
 
+void Move::inputFrame(InputFrame::Ptr f, uint32_t playerid)
+{
+  Order::inputFrame(f, playerid);
+}
+
 void Move::createFrame(OutputFrame::Ptr f, int pos)
 {
   Logger::getLogger()->debug("Enter Move::createFrame");
@@ -83,7 +88,7 @@ void Move::createFrame(OutputFrame::Ptr f, int pos)
     Game::getGame()->getObjectManager()->doneWithObject(obj->getID());
   }else{
     turns = 0;
-    Logger::getLogger()->error("Move create frame: object not found, id = %d", obj->getID());
+    Logger::getLogger()->error("Move create frame: object not found, orderqueue id = %d", orderqueueid);
   }
   Logger::getLogger()->debug("Exit Move::createFrame");
   Order::createFrame(f, pos);	

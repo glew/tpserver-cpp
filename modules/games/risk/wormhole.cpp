@@ -13,7 +13,8 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
+ *  You should have receivuniverse->setIcon("common/object-icons/system");
+   universe->setMedia("common-2d/foreign/freeorion/nebula-small/nebula3");ed a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
@@ -21,7 +22,7 @@
 
 #include <tpserver/position3dobjectparam.h>
 #include <tpserver/objectparametergroupdesc.h>
-#include <tpserver/sizeobjectparam.h>
+#include <tpserver/mediaobjectparam.h>
 #include <tpserver/object.h>
 
 #include "containertypes.h"
@@ -30,9 +31,12 @@
 
 namespace RiskRuleset {
 
-WormholeType::WormholeType() : StaticObjectType( "Wormhole", "Holes in the fabric of space allowing instant travel" ) {
-  ObjectParameterGroupDesc::Ptr group = createParameterGroupDesc( "Informational", "Information about the wormhole");
-   group->addParameter(obpT_Position_3D, "Exit", "Where the wormhole exits.");
+WormholeType::WormholeType() : ObjectType( "Wormhole", "Holes in the fabric of space allowing instant travel" ) {
+    ObjectParameterGroupDesc::Ptr group = createParameterGroupDesc( "Positional", "Describes the position");
+   group->addParameter(obpT_Position_3D, "EndA", "One end of the wormhold");
+   group->addParameter(obpT_Position_3D, "EndB", "The other end of the wormhole.");
+   group = createParameterGroupDesc("Media", "Media information");
+   group->addParameter(obpT_Media, "Icon", "The icon for this object");
 
 }
 
@@ -40,15 +44,23 @@ ObjectBehaviour* WormholeType::createObjectBehaviour() const{
    return new Wormhole();
 }
 
-Wormhole::Wormhole() : StaticObject() {
+Wormhole::Wormhole() : ObjectBehaviour() {
 }
 
-void Wormhole::setExit(const Vector3d &npos) {
-   ((Position3dObjectParam*)(obj->getParameter(2, 1)))->setPosition(npos);
+void Wormhole::setEndA(const Vector3d &npos) {
+   ((Position3dObjectParam*)(obj->getParameter(1, 1)))->setPosition(npos);
 }
 
-Vector3d Wormhole::getExit() {
-   return ((Position3dObjectParam*)(obj->getParameter(2, 1)))->getPosition();
+void Wormhole::setEndB(const Vector3d &npos) {
+   ((Position3dObjectParam*)(obj->getParameter(1, 2)))->setPosition(npos);
+}
+
+Vector3d Wormhole::getEndA() {
+   return ((Position3dObjectParam*)(obj->getParameter(1, 1)))->getPosition();
+}
+
+Vector3d Wormhole::getEndB() {
+   return ((Position3dObjectParam*)(obj->getParameter(1, 2)))->getPosition();
 }
 
 int Wormhole::getContainerType() {
@@ -56,7 +68,7 @@ int Wormhole::getContainerType() {
 }
 
 void Wormhole::packExtraData(OutputFrame::Ptr frame) {
-   Vector3d end = getExit();
+   Vector3d end = getEndB();
    frame->packInt64(end.getX());
    frame->packInt64(end.getY());
    frame->packInt64(end.getZ());
@@ -65,7 +77,7 @@ void Wormhole::packExtraData(OutputFrame::Ptr frame) {
 void Wormhole::doOnceATurn() {}
 
 void Wormhole::setupObject(){
-   setSize(0x1L);
+    ((MediaObjectParam*)(obj->getParameter(2,1)))->setMediaUrl("common/object-icons/link");
 }
 
 }

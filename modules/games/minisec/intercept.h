@@ -1,8 +1,8 @@
-#ifndef OBJECTVIEW_H
-#define OBJECTVIEW_H
-/*  ObjectView class
+#ifndef INTERCEPT_H
+#define INTERCEPT_H
+/*  Intercept Order
  *
- *  Copyright (C) 2008  Lee Begg and the Thousand Parsec Project
+ *  Copyright (C) 2004, 2007  Lee Begg and the Thousand Parsec Project
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,26 +20,31 @@
  *
  */
 
-#include <string>
-#include <set>
-#include <stdint.h>
-#include <tpserver/protocolview.h>
+#include <tpserver/order.h>
+#include <tpserver/orderparameters.h>
 
-class ObjectView : public ProtocolView {
+class ObjectOrderParameter;
+
+class Intercept : public Order{
   public:
-    typedef boost::shared_ptr< ObjectView > Ptr;
-    ObjectView();
-    explicit ObjectView( uint32_t new_id, bool visibility = false );
-    virtual ~ObjectView();
+    Intercept();
+    virtual ~Intercept();
 
-    void packFrame(OutputFrame::Ptr frame, uint32_t playerid) const;
-    void pack(OutputFrame::Ptr frame) const { throw 0; }
+    Vector3d getDest() const;
+    void setDest(const Vector3d & ndest);
 
-    uint32_t getObjectId() const;
+    void createFrame(OutputFrame::Ptr f, int pos);
+    void inputFrame(InputFrame::Ptr f, uint32_t playerid);
+    ObjectOrderParameter* getDestination();
 
-    void setObjectId(uint32_t id);
+    bool doOrder(IGObject::Ptr ob);
+
+    Order* clone() const;
+
+  private:
+    ObjectOrderParameter* destination;
+
 
 };
-
 
 #endif
